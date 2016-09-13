@@ -1,2 +1,2 @@
-# bdbagd
-REST Web Service Interface for BDBag
+# ioboxd
+REST Web Service Interface for IOBox
