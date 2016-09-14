@@ -28,13 +28,13 @@ UNINSTALL=$(UNINSTALL_DIRS)
 #       $(BINDIR)/ioboxd-db-init
 
 # make this the default target
-install: conf/wsgi_ioboxd.conf force
+install: conf/wsgi_ioboxd.conf
 		pip install --process-dependency-links --trusted-host github.com  .
 
-reinstall: uninstall force
+reinstall: uninstall conf/wsgi_ioboxd.conf
 		pip install -I --process-dependency-links --trusted-host github.com  .
 
-testvars: force
+testvars:
 		@echo DAEMONUSER=$(DAEMONUSER)
 		@echo CONFDIR=$(CONFDIR)
 		@echo SYSPREFIX=$(SYSPREFIX)
@@ -49,16 +49,15 @@ deploy: install
 conf/wsgi_ioboxd.conf: conf/wsgi_ioboxd.conf.in
 		./install-script -M sed -R @PYLIBDIR@=$(PYLIBDIR) @WSGISOCKETPREFIX@=$(WSGISOCKETPREFIX) @DAEMONUSER@=$(DAEMONUSER) -o root -g root -m a+r -p -D $< $@
 
-uninstall: force
+uninstall:
 		-pip uninstall -y ioboxd
 		rm -f ${HTTPDCONFDIR}/wsgi_ioboxd.conf
 		rm -f /etc/cron.daily/ioboxd-prune
 #       -rmdir --ignore-fail-on-non-empty -p $(UNINSTALL_DIRS)
 
-preinstall_centos: force
+preinstall_centos:
 		yum -y install python python-pip python-psycopg2 python-dateutil python-webpy pytz
 
-preinstall_ubuntu: force
+preinstall_ubuntu:
 		apt-get -y install python python-pip python-psycopg2 python-dateutil python-webpy python-tz
 
-force:
