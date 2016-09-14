@@ -1,0 +1,15 @@
+# this file must be loaded (alphabetically) after wsgi.conf
+AllowEncodedSlashes On
+
+WSGIPythonOptimize 1
+WSGIDaemonProcess ioboxd processes=4 threads=4 user=@DAEMONUSER@ maximum-requests=2000
+WSGIScriptAlias /iobox @PYLIBDIR@/ioboxd/ioboxd.wsgi
+WSGIPassAuthorization On
+
+WSGISocketPrefix @WSGISOCKETPREFIX@
+
+<Location "/iobox" >
+   Require all granted
+   WSGIProcessGroup ioboxd
+</Location>
+

@@ -1,0 +1,7 @@
+{
+    "storage_path": "/var/www/iobox/data",
+    "authentication":"webauthn",
+    "404_html": "<html><body><h1>Resource Not Found</h1><p>The requested resource could not be found at this location. It is possible that it never existed, was deleted by the system, or an error occurred while it was being created.</p><p><pre>%(message)s</pre></p></body></html>",
+    "403_html": "<html><body><h1>Access Forbidden</h1><p>%(message)s</p></body></html>",
+    "401_html": "<html><body><h1>Authentication Required</h1><p>%(message)s</p></body></html>"
+}

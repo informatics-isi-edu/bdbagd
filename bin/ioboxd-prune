@@ -1,0 +1,2 @@
+#!/bin/bash
+find /var/www/iobox/data -type d -mtime +3 -exec rm -rf {} +
