@@ -117,4 +117,4 @@ fi
 # this is supposed to be idempotent too...
 #$SU -c "ioboxd-db-init" - "${DAEMONUSER}"
 
-service httpd restart
+# service httpd restart
