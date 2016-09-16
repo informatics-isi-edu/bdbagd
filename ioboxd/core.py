@@ -30,12 +30,12 @@ STORAGE_BASE_DIR = os.path.join("ioboxd", "data")
 DEFAULT_CONFIG = {
     "storage_path": os.path.abspath(os.path.join(SERVICE_BASE_DIR, STORAGE_BASE_DIR)),
     "authentication": None,
-    "404_html": "<html><body><h1>Resource Not Found</h1><p>The requested resource could not be found at this location. "
-                "It is possible that it never existed, was deleted by the system, or an error occurred while it was "
-                "being created.</p><p><pre>%(message)s</pre></p></body></html>",
+    "404_html": "<html><body><h1>Resource Not Found</h1><p>The requested resource could not be found at this location."
+                "</p><p>Additional information:</p><p><pre>%(message)s</pre></p></body></html>",
     "403_html": "<html><body><h1>Access Forbidden</h1><p>%(message)s</p></body></html>",
-    "401_html": "<html><body><h1>Authentication Required</h1><p>%(message)s</p></body></html>"
-
+    "401_html": "<html><body><h1>Authentication Required</h1><p>%(message)s</p></body></html>",
+    "400_html": "<html><body><h1>Bad Request</h1><p>One or more request parameters are incorrect. "
+                "</p><p>Additional information:</p><p><pre>%(message)s</pre></p></body></html>",
 }
 DEFAULT_CONFIG_FILE = os.path.abspath(os.path.join(SERVICE_BASE_DIR, 'ioboxd_config.json'))
 
@@ -113,12 +113,6 @@ class NotModified(RestException):
     status = '304 Not Modified'
     message = 'Resource not modified.'
 
-
-class BadRequest(RestException):
-    status = '400 Bad Request'
-    message = 'Request malformed.'
-
-
 class TemplatedRestException(RestException):
     error_type = ''
     supported_content_types = ['text/plain', 'text/html']
@@ -141,6 +135,12 @@ class TemplatedRestException(RestException):
         headers = headers.update(header) if headers else header
         RestException.__init__(self, message, headers)
         web.header('Content-Type', content_type)
+
+
+class BadRequest(TemplatedRestException):
+    error_type = '400'
+    status = '400 Bad Request'
+    message = 'Request malformed.'
 
 
 class Unauthorized(TemplatedRestException):

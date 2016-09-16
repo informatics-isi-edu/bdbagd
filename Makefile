@@ -29,9 +29,6 @@ UNINSTALL=$(UNINSTALL_DIRS)
 
 # make this the default target
 install: conf/wsgi_ioboxd.conf
-		pip install --process-dependency-links --trusted-host github.com  .
-
-reinstall: uninstall conf/wsgi_ioboxd.conf
 		pip install -I --process-dependency-links --trusted-host github.com  .
 
 testvars:
@@ -46,11 +43,14 @@ testvars:
 deploy: install
 		env SHAREDIR=$(SHAREDIR) HTTPDCONFDIR=$(HTTPDCONFDIR) ioboxd-deploy
 
+redeploy: uninstall deploy
+
 conf/wsgi_ioboxd.conf: conf/wsgi_ioboxd.conf.in
 		./install-script -M sed -R @PYLIBDIR@=$(PYLIBDIR) @WSGISOCKETPREFIX@=$(WSGISOCKETPREFIX) @DAEMONUSER@=$(DAEMONUSER) -o root -g root -m a+r -p -D $< $@
 
 uninstall:
 		-pip uninstall -y ioboxd
+		rm -f /home/${DAEMONUSER}/ioboxd_config.json
 		rm -f ${HTTPDCONFDIR}/wsgi_ioboxd.conf
 		rm -f /etc/cron.daily/ioboxd-prune
 #       -rmdir --ignore-fail-on-non-empty -p $(UNINSTALL_DIRS)

@@ -22,36 +22,47 @@ class ExportRetrieve (RestHandler):
     def GET(self, key, requested_file=None):
         export_dir = os.path.abspath(os.path.join(STORAGE_PATH, key))
         if not os.path.isdir(export_dir):
-            raise NotFound()
+            raise NotFound("The resource %s does not exist. It was never created or has been deleted." % key)
         if not check_access(export_dir):
             return Forbidden("The currently authenticated user is not permitted to access the specified resource.")
 
-        file_path = None
         for dirname, dirnames, filenames in os.walk(export_dir):
-            filenames.remove(".access")
-            if filenames.__len__() > 1:
+
+            # first, deal with the special case "metadata" files...
+            if ".access" in filenames:
+                filenames.remove(".access")
+            log_path = os.path.abspath(os.path.join(dirname, ".log"))
+            if ".log" in filenames:
+                if requested_file and requested_file == 'log':
+                    return self.send_log(log_path)
+                filenames.remove(".log")
+
+            # if there are no remaining files in the dir list, we don't have anything to reply with.
+            # so, raise a 404 but also try to send back the log (if it exists) as additional diagnostic info.
+            if not filenames:
+                log_text = 'No additional diagnostic information available.\n'
+                if os.path.isfile(log_path):
+                    with open(log_path) as log:
+                        log_text = log.read()
+                raise NotFound(log_text)
+            else:
+                # otherwise we've got at least one file to reply with...
                 for filename in filenames:
-                    file_path = os.path.join(dirname, filename)
-                    if filename == ".log":
-                        if requested_file and requested_file == 'log':
-                            return self.send_log(file_path)
+                    file_path = os.path.abspath(os.path.join(dirname, filename))
+                    if not requested_file:
+                        # if there is more than one file in the resource bucket and the caller wasn't explicit about
+                        # which one to retrieve, it is a bad request.
+                        if filenames.__len__() > 1:
+                            raise BadRequest("The resource %s contains more than one file, it is therefore necessary "
+                                             "to specify a filename in the request URL." % key)
                         else:
-                            continue
-                    if requested_file:
+                            return self.send_content(file_path)
+                    else:
+                        # otherwise keep looping until we find a match
                         if requested_file == filename:
                             return self.send_content(file_path)
                         else:
                             continue
-                    else:
-                        return self.send_content(file_path)
 
-            else:
-                log_text = 'No additional diagnostic information available.\n'
-                if filenames[0] == ".log":
-                    file_path = os.path.join(dirname, filenames[0])
-                    with open(file_path) as log:
-                        log_text = log.read()
-                raise NotFound(log_text)
-
-        if not file_path:
-            raise NotFound()
+        # if we got here it means the caller asked for something that does not exist.
+        raise NotFound("The requested file \"%s\" does not exist." % requested_file)
