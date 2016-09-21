@@ -126,7 +126,7 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
             bdb.cleanup_bag(bag_path)
             raise e
         finally:
-            if os.path.exists(remote_file_manifest):
+            if remote_file_manifest and os.path.exists(remote_file_manifest):
                 os.remove(remote_file_manifest)
 
         logger.info('Created bag: %s' % bag_path)
