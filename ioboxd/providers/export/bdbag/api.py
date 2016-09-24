@@ -71,13 +71,13 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                 elif output_format == 'prefetch':
                     headers = {'accept': 'application/x-json-stream'}
                     output_file = os.path.abspath(
-                        ''.join([os.path.join(bag_path, output_name) if output_name else 'prefetch-manifest', '.json']))
+                        ''.join([os.path.join(bag_path, output_name if output_name else 'prefetch-manifest'), '.json']))
                 elif output_format == 'fetch':
                     headers = {'accept': 'application/x-json-stream'}
                     remote_file_manifest = os.path.abspath(
                         ''.join([os.path.join(base_dir, 'remote-file-manifest'), '.json']))
                     output_file = os.path.abspath(
-                        ''.join([os.path.join(bag_path, output_name) if output_name else 'fetch-manifest', '.json']))
+                        ''.join([os.path.join(bag_path, output_name if output_name else 'fetch-manifest'), '.json']))
                 else:
                     raise BadRequest("Unsupported output type: %s" % output_format)
 
