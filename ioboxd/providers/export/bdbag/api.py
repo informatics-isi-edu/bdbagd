@@ -1,11 +1,15 @@
-import os.path
+import os
+import copy
 import logging
+import mimetypes
 import time
 import simplejson as json
+from ioboxd.globals import FILETYPE_ONTOLOGY_MAP, MIMETYPE_EXTENSION_MAP
 from ioboxd.core import BadRequest, Unauthorized
 from ioboxd.providers.export.api import configure_logging, create_access_descriptor, open_session, get_file
 import bdbag
 from bdbag import bdbag_api as bdb
+from bdbag import bdbag_ro as ro
 
 logger = logging.getLogger('')
 logger.propagate = False
@@ -42,12 +46,16 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
         else:
             raise Unauthorized("The requested service requires authentication.")
 
-        create_access_descriptor(base_dir, identity=username if not identity else identity)
+        create_access_descriptor(base_dir, identity=username if not identity else identity['id'])
 
         if not os.path.exists(bag_path):
             os.makedirs(bag_path)
         bag = bdb.make_bag(bag_path, algs=['sha256'], metadata=bag_metadata)
+
         remote_file_manifest = None
+        ro_creator_name = username if not identity else identity.get(
+            'full_name', identity.get('display_name', identity.get('id', None)))
+        ro_manifest = init_ro_manifest(creator_name=ro_creator_name)
 
         for query in catalog_config['queries']:
             url = ''.join([host, path, query['query_path']])
@@ -63,11 +71,25 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                     output_path = \
                         ''.join([os.path.join(output_path, output_name) if output_name else output_path, '.csv'])
                     output_file = os.path.abspath(os.path.join(bag_path, 'data', output_path))
+                    file_ext = os.path.splitext(output_file)[1][1:]
+                    ro.add_provenance(
+                        ro.add_aggregate(ro_manifest,
+                                         uri=''.join(["../data/", output_path]),
+                                         mediatype="text/csv",
+                                         conforms_to=FILETYPE_ONTOLOGY_MAP.get(file_ext, None)),
+                        retrieved_from=dict(retrievedFrom=url))
                 elif output_format == 'json':
                     headers = {'accept': 'application/json'}
                     output_path = \
                         ''.join([os.path.join(output_path, output_name) if output_name else output_path, '.json'])
                     output_file = os.path.abspath(os.path.join(bag_path, 'data', output_path))
+                    file_ext = os.path.splitext(output_file)[1][1:]
+                    ro.add_provenance(
+                        ro.add_aggregate(ro_manifest,
+                                         uri=''.join(["../data/", output_path]),
+                                         mediatype="application/json",
+                                         conforms_to=FILETYPE_ONTOLOGY_MAP.get(file_ext, None)),
+                        retrieved_from=dict(retrievedFrom=url))
                 elif output_format == 'prefetch':
                     headers = {'accept': 'application/x-json-stream'}
                     output_file = os.path.abspath(
@@ -92,19 +114,28 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                     try:
                         with open(output_file, "r") as in_file:
                             for line in in_file:
-                                prefetch_entry = json.loads(line)
-                                prefetch_url = prefetch_entry['url']
-                                prefetch_length = int(prefetch_entry['length'])
-                                prefetch_filename = \
+                                entry = json.loads(line)
+                                url = entry['url']
+                                length = int(entry['length'])
+                                filename = \
                                     os.path.abspath(os.path.join(
-                                        bag_path, 'data', output_path, prefetch_entry['filename']))
-                                logger.debug("Prefetching %s as %s" % (prefetch_url, prefetch_filename))
-                                get_file(prefetch_url, prefetch_filename, headers, session)
-                                file_bytes = os.path.getsize(prefetch_filename)
-                                if prefetch_length != file_bytes:
+                                        bag_path, 'data', output_path, entry['filename']))
+                                logger.debug("Prefetching %s as %s" % (url, filename))
+                                get_file(url, filename, headers, session)
+                                file_bytes = os.path.getsize(filename)
+                                if length != file_bytes:
                                     raise RuntimeError(
                                         "File size of %s does not match expected size of %s for file %s" %
-                                        (prefetch_length, file_bytes, prefetch_filename))
+                                        (length, file_bytes, filename))
+                                file_ext = os.path.splitext(entry['filename'])[1][1:]
+                                mimetype = guess_mimetype(entry['url'])
+                                ro.add_provenance(
+                                    ro.add_aggregate(ro_manifest,
+                                                     uri=''.join(["../", output_path, "/", entry['filename']]),
+                                                     mediatype=mimetype if mimetype
+                                                     else MIMETYPE_EXTENSION_MAP.get(file_ext, None),
+                                                     conforms_to=FILETYPE_ONTOLOGY_MAP.get(file_ext, None)),
+                                    retrieved_from=dict(retrievedFrom=entry['url']))
                     finally:
                         os.remove(output_file)
 
@@ -112,6 +143,16 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                     with open(output_file, "r") as in_file, open(remote_file_manifest, "w") as remote_file:
                         for line in in_file:
                             remote_file.write(line)
+                            entry = json.loads(line)
+                            file_ext = os.path.splitext(entry['filename'])[1][1:]
+                            mimetype = guess_mimetype(entry['url'])
+                            ro.add_provenance(
+                                ro.add_aggregate(ro_manifest,
+                                                 uri=''.join(["../", entry['filename']]),
+                                                 mediatype=mimetype if mimetype
+                                                 else MIMETYPE_EXTENSION_MAP.get(file_ext, None),
+                                                 conforms_to=FILETYPE_ONTOLOGY_MAP.get(file_ext, None)),
+                                retrieved_from=dict(retrievedFrom=entry['url']))
                     os.remove(output_file)
 
             except RuntimeError as e:
@@ -120,6 +161,12 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                 raise e
 
         try:
+            bag_metadata_dir = os.path.abspath(os.path.join(bag_path, "metadata"))
+            if not os.path.exists(bag_metadata_dir):
+                os.mkdir(bag_metadata_dir)
+            ro_manifest_path = os.path.join(bag_metadata_dir, "manifest.json")
+            ro.write_ro_manifest(ro_manifest, ro_manifest_path)
+            bag_metadata.update({bdbag.BAG_PROFILE_TAG: bdbag.BDBAG_RO_PROFILE_ID})
             bag = bdb.make_bag(bag_path, remote_file_manifest=remote_file_manifest, update=True)
         except Exception as e:
             logger.fatal("Exception while updating bag manifests: %s", bdbag.get_named_exception(e))
@@ -143,3 +190,23 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
             return bag_path
     finally:
         logger.removeHandler(log_handler)
+
+
+def init_ro_manifest(creator_name=None, creator_uri=None, creator_orcid=None):
+    manifest = copy.deepcopy(ro.DEFAULT_RO_MANIFEST)
+    created_on = ro.make_created_on()
+    created_by = None
+    if creator_name:
+        if creator_orcid and not creator_orcid.startswith("http"):
+            creator_orcid = "/".join(["http://orcid.org", creator_orcid])
+        created_by = ro.make_created_by(creator_name, uri=creator_uri, orcid=creator_orcid)
+    ro.add_provenance(manifest, created_on=created_on, created_by=created_by)
+
+    return manifest
+
+
+def guess_mimetype(file_path):
+    mtype = mimetypes.guess_type(file_path, False)
+    mimetype = "+".join([mtype[0], mtype[1]]) if (mtype[0] is not None and mtype[1] is not None) \
+        else (mtype[0] if mtype[0] is not None else mtype[1])
+    return mimetype

@@ -212,7 +212,7 @@ def client_has_identity(identity):
 def get_client_identity():
     get_client_auth_context()
     if web.ctx.webauthn2_context and web.ctx.webauthn2_context.client:
-        return web.ctx.webauthn2_context.client['id']
+        return web.ctx.webauthn2_context.client
     else:
         return None
 
