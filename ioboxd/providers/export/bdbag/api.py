@@ -4,6 +4,7 @@ import logging
 import mimetypes
 import time
 import simplejson as json
+import uuid
 from ioboxd.globals import FILETYPE_ONTOLOGY_MAP, MIMETYPE_EXTENSION_MAP
 from ioboxd.core import BadRequest, Unauthorized
 from ioboxd.providers.export.api import configure_logging, create_access_descriptor, open_session, get_file
@@ -63,7 +64,8 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
             output_path = query['output_path']
             output_format = query['output_format']
             schema_path = query.get('schema_path', None)
-            schema_output_path = os.path.abspath(os.path.join(bag_path, 'data', ''.join([output_path, '-schema.json'])))
+            schema_name = ''.join([output_path, '-schema.json'])
+            schema_output_path = os.path.abspath(os.path.join(bag_path, 'data', schema_name))
 
             try:
                 if output_format == 'csv':
@@ -71,24 +73,22 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                     output_path = \
                         ''.join([os.path.join(output_path, output_name) if output_name else output_path, '.csv'])
                     output_file = os.path.abspath(os.path.join(bag_path, 'data', output_path))
-                    file_ext = os.path.splitext(output_file)[1][1:]
                     ro.add_provenance(
                         ro.add_aggregate(ro_manifest,
                                          uri=''.join(["../data/", output_path]),
                                          mediatype="text/csv",
-                                         conforms_to=FILETYPE_ONTOLOGY_MAP.get(file_ext, None)),
+                                         conforms_to=FILETYPE_ONTOLOGY_MAP.get('.csv', None)),
                         retrieved_from=dict(retrievedFrom=url))
                 elif output_format == 'json':
                     headers = {'accept': 'application/json'}
                     output_path = \
                         ''.join([os.path.join(output_path, output_name) if output_name else output_path, '.json'])
                     output_file = os.path.abspath(os.path.join(bag_path, 'data', output_path))
-                    file_ext = os.path.splitext(output_file)[1][1:]
                     ro.add_provenance(
                         ro.add_aggregate(ro_manifest,
                                          uri=''.join(["../data/", output_path]),
                                          mediatype="application/json",
-                                         conforms_to=FILETYPE_ONTOLOGY_MAP.get(file_ext, None)),
+                                         conforms_to=FILETYPE_ONTOLOGY_MAP.get('.json', None)),
                         retrieved_from=dict(retrievedFrom=url))
                 elif output_format == 'prefetch':
                     headers = {'accept': 'application/x-json-stream'}
@@ -108,6 +108,16 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                 if schema_path:
                     schema_url = ''.join([host, path, schema_path])
                     get_file(schema_url, schema_output_path, {'accept': 'application/json'}, session)
+                    ro.add_provenance(
+                        ro.add_aggregate(ro_manifest,
+                                         uri=''.join(["../data/", schema_name]),
+                                         mediatype="application/json",
+                                         conforms_to=FILETYPE_ONTOLOGY_MAP.get('.json', None)),
+                        retrieved_from=dict(retrievedFrom=schema_url))
+                    ro.add_annotation(ro_manifest,
+                                      uri=str("urn:uuid:%s" % str(uuid.uuid4())),
+                                      about=''.join(["../data/", output_path]),
+                                      content=''.join(["../data/", schema_name]))
 
                 if output_format == 'prefetch':
                     logger.info("Prefetching file(s)...")
@@ -131,7 +141,7 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                                 mimetype = guess_mimetype(entry['url'])
                                 ro.add_provenance(
                                     ro.add_aggregate(ro_manifest,
-                                                     uri=''.join(["../", output_path, "/", entry['filename']]),
+                                                     uri=''.join(["../data/", output_path, "/", entry['filename']]),
                                                      mediatype=mimetype if mimetype
                                                      else MIMETYPE_EXTENSION_MAP.get(file_ext, None),
                                                      conforms_to=FILETYPE_ONTOLOGY_MAP.get(file_ext, None)),
@@ -148,7 +158,7 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                             mimetype = guess_mimetype(entry['url'])
                             ro.add_provenance(
                                 ro.add_aggregate(ro_manifest,
-                                                 uri=''.join(["../", entry['filename']]),
+                                                 uri=''.join(["../data/", entry['filename']]),
                                                  mediatype=mimetype if mimetype
                                                  else MIMETYPE_EXTENSION_MAP.get(file_ext, None),
                                                  conforms_to=FILETYPE_ONTOLOGY_MAP.get(file_ext, None)),
