@@ -29,7 +29,7 @@ UNINSTALL=$(UNINSTALL_DIRS)
 
 # make this the default target
 install: conf/wsgi_ioboxd.conf
-		pip install -I --process-dependency-links --trusted-host github.com  .
+		pip2 install -I --process-dependency-links --trusted-host github.com  .
 
 testvars:
 		@echo DAEMONUSER=$(DAEMONUSER)
@@ -49,7 +49,7 @@ conf/wsgi_ioboxd.conf: conf/wsgi_ioboxd.conf.in
 		./install-script -M sed -R @PYLIBDIR@=$(PYLIBDIR) @WSGISOCKETPREFIX@=$(WSGISOCKETPREFIX) @DAEMONUSER@=$(DAEMONUSER) -o root -g root -m a+r -p -D $< $@
 
 uninstall:
-		-pip uninstall -y ioboxd
+		-pip2 uninstall -y ioboxd
 		rm -f /home/${DAEMONUSER}/ioboxd_config.json
 		rm -f ${HTTPDCONFDIR}/wsgi_ioboxd.conf
 		rm -f /etc/cron.daily/ioboxd-prune
