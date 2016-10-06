@@ -14,7 +14,7 @@ setup(
     url='https://github.com/informatics-isi-edu/ioboxd',
     maintainer='USC Information Sciences Institute ISR Division',
     maintainer_email='misd-support@isi.edu',
-    version="0.1.5",
+    version="0.2.0",
     zip_safe=False,
     packages=find_packages(),
     scripts=["bin/ioboxd-deploy", "bin/ioboxd-prune"],
@@ -44,10 +44,10 @@ setup(
         "psycopg2",
         "webauthn2"],
     install_requires=[
-        'bdbag==0.9.6'
+        'bdbag==0.9.7'
     ],
     dependency_links=[
-        'http://github.com/ini-bdds/bdbag/archive/master.zip#egg=bdbag-0.9.6'
+        'http://github.com/ini-bdds/bdbag/archive/master.zip#egg=bdbag-0.9.7'
     ],
     license='Apache 2.0',
     classifiers=[

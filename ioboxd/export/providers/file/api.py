@@ -1,7 +1,8 @@
 import os.path
-import logging
-from ioboxd.core import BadRequest, Unauthorized
-from ioboxd.providers.export.api import configure_logging, create_access_descriptor, open_session, get_file
+
+from ioboxd.core import BadRequest
+from ioboxd.export.api import *
+from ioboxd.export.transforms import *
 
 logger = logging.getLogger('')
 logger.propagate = False
@@ -23,14 +24,8 @@ def export_files(config=None, cookies=None, base_dir=None, identity=None, quiet=
         except Exception as e:
             raise BadRequest('Error parsing configuration: %s' % e)
 
-        if username and password:
-            session = open_session(host, login_params={'username': username, 'password': password})
-        elif cookies:
-            session = open_session(host, cookies=cookies)
-        else:
-            raise Unauthorized("The requested service requires authentication.")
-
-        create_access_descriptor(base_dir, identity)
+        session = authenticate(host, cookies, username, password)
+        create_access_descriptor(base_dir, identity=username if not identity else identity['id'])
 
         file_list = list()
         for query in catalog_config['queries']:
@@ -38,24 +33,33 @@ def export_files(config=None, cookies=None, base_dir=None, identity=None, quiet=
             output_name = query.get('output_name', None)
             output_path = query['output_path']
             output_format = query['output_format']
+            output_format_params = query.get('output_format_params', None)
             schema_path = query.get('schema_path', None)
             schema_output_file = os.path.abspath(os.path.join(base_dir, ''.join([output_path, '-schema.json'])))
 
             try:
                 if output_format == 'csv':
                     headers = {'accept': 'text/csv'}
-                    output_path = \
-                        ''.join([os.path.join(output_path, output_name) if output_name else output_path, '.csv'])
-                    output_file = os.path.abspath(os.path.join(base_dir, output_path))
+                    ext = '.csv'
                 elif output_format == 'json':
                     headers = {'accept': 'application/json'}
-                    output_path = \
-                        ''.join([os.path.join(output_path, output_name) if output_name else output_path, '.json'])
-                    output_file = os.path.abspath(os.path.join(base_dir, output_path))
+                    ext = '.json'
+                elif output_format == 'fasta':
+                    headers = {'accept': 'application/x-json-stream'}
+                    ext = '.json'
                 else:
                     raise BadRequest("Unsupported output type: %s" % output_format)
 
+                output_path = get_final_output_path(output_path, output_name, ext)
+                output_file = os.path.abspath(os.path.join(base_dir, output_path))
                 get_file(url, output_file, headers, session)
+
+                if output_format == 'fasta':
+                    result_file = ''.join([os.path.splitext(output_file)[0], '.fasta'])
+                    fasta.convert_json_file_to_fasta(output_file, result_file, output_format_params)
+                    os.remove(output_file)
+                    output_file = result_file
+
                 file_list.append(output_file)
 
                 if schema_path:
@@ -63,11 +67,11 @@ def export_files(config=None, cookies=None, base_dir=None, identity=None, quiet=
                     get_file(schema_url, schema_output_file, {'accept': 'application/json'}, session)
                     file_list.append(schema_output_file)
 
-                return file_list
-
             except RuntimeError as e:
                 logger.error("Unhandled runtime error: %s", e)
                 raise e
+
+        return file_list
 
     finally:
         logger.removeHandler(log_handler)

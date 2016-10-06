@@ -1,5 +1,5 @@
 from ioboxd.core import *
-from ioboxd.providers.export.api import check_access
+from ioboxd.export.api import check_access
 
 
 class ExportRetrieve (RestHandler):

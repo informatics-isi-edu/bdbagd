@@ -3,9 +3,9 @@
 # Distributed under the Apache License, Version 2.0. See LICENSE for more info.
 #
 
-from ioboxd.providers.export.rest import *
-from ioboxd.providers.export.bdbag.rest import *
-from ioboxd.providers.export.file.rest import *
+from ioboxd.export.rest import ExportRetrieve
+from ioboxd.export.providers.file.rest import ExportFiles
+from ioboxd.export.providers.bdbag.rest import ExportBag
 
 
 def web_urls():

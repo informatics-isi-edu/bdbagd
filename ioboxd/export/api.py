@@ -2,6 +2,7 @@ import os
 import errno
 import certifi
 import logging
+import mimetypes
 import os.path
 import uuid
 import urlparse
@@ -43,6 +44,10 @@ def create_output_dir():
     return key, output_dir
 
 
+def get_final_output_path(output_path, output_name=None, ext=''):
+    return ''.join([os.path.join(output_path, output_name) if output_name else output_path, ext])
+
+
 def create_access_descriptor(directory, identity):
     with open(os.path.abspath(os.path.join(directory, ".access")), 'w') as access:
         if identity:
@@ -58,6 +63,17 @@ def check_access(directory):
         return False
     else:
         return True if not AUTHENTICATION else False
+
+
+def authenticate(host, cookies=None, username=None, password=None):
+    if username and password:
+        session = open_session(host, login_params={'username': username, 'password': password})
+    elif cookies:
+        session = open_session(host, cookies=cookies)
+    else:
+        raise Unauthorized("The requested service requires authentication.")
+
+    return session
 
 
 def open_session(host, cookies=None, login_params=None):
@@ -114,3 +130,19 @@ def get_file(url, output_path, headers, session):
                 logger.info('File transfer successful: [%s]' % output_path)
         except requests.exceptions.RequestException as e:
             raise RuntimeError('HTTP Request Exception: %s %s' % (e.errno, e.message))
+
+
+def guess_mimetype(file_path):
+    mtype = mimetypes.guess_type(file_path, False)
+    mimetype = "+".join([mtype[0], mtype[1]]) if (mtype[0] is not None and mtype[1] is not None) \
+        else (mtype[0] if mtype[0] is not None else mtype[1])
+    return mimetype
+
+
+def has_attr(obj, attr, quiet=False):
+    if getattr(obj, attr, None) is None:
+        if not quiet:
+            logger.warn("Unable to locate attribute [%s] in object: %s" %
+                        (attr, str(obj)))
+        return False
+    return True

@@ -58,5 +58,6 @@ FILETYPE_ONTOLOGY_MAP = {
 MIMETYPE_EXTENSION_MAP = {
     "dcm": "application/dicom",
     "dicom": "application/dicom",
+    "fasta": "application/fasta",
     "nii": "application/x-nifti"
 }
