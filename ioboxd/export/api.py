@@ -18,6 +18,11 @@ logger = logging.getLogger('')
 logger.propagate = False
 
 
+def get_named_exception(e):
+    exc = "".join(("[", type(e).__name__, "] "))
+    return "".join((exc, str(e)))
+
+
 def configure_logging(level=logging.INFO, log_path=None):
 
     logger.setLevel(level)
@@ -50,19 +55,18 @@ def get_final_output_path(output_path, output_name=None, ext=''):
 
 def create_access_descriptor(directory, identity):
     with open(os.path.abspath(os.path.join(directory, ".access")), 'w') as access:
-        if identity:
-            access.writelines(''.join([identity, '\n']))
+        access.writelines(''.join([identity if identity else "*", '\n']))
 
 
 def check_access(directory):
-    if get_client_identity():
-        with open(os.path.abspath(os.path.join(directory, ".access")), 'r') as access:
-            for identity in access.readlines():
-                if client_has_identity(identity.strip()):
-                    return True
-        return False
-    else:
-        return True if not AUTHENTICATION else False
+    if not AUTHENTICATION:
+        return True
+
+    with open(os.path.abspath(os.path.join(directory, ".access")), 'r') as access:
+        for identity in access.readlines():
+            if client_has_identity(identity.strip()):
+                return True
+    return False
 
 
 def authenticate(host, cookies=None, username=None, password=None):

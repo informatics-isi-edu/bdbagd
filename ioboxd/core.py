@@ -202,6 +202,8 @@ class NotImplemented(RestException):
 
 
 def client_has_identity(identity):
+    if identity == "*":
+        return True
     get_client_auth_context()
     for attrib in web.ctx.webauthn2_context.attributes:
         if attrib['id'] == identity:
@@ -227,8 +229,8 @@ def get_client_auth_context():
         if web.ctx.webauthn2_context.client is None:
             web.ctx.webauthn2_context = webauthn2_manager.get_request_context() if webauthn2_manager else None
             logger.debug("webauthn2_context: %s" % web.ctx.webauthn2_context)
-            if web.ctx.webauthn2_context and web.ctx.webauthn2_context.client is None:
-                raise Unauthorized('The requested service requires client authentication.')
+            # if web.ctx.webauthn2_context and web.ctx.webauthn2_context.client is None:
+            #    raise Unauthorized('The requested service requires client authentication.')
     except (ValueError, IndexError), ev:
         raise Unauthorized('The requested service requires client authentication.')
 
@@ -264,7 +266,7 @@ def web_method():
                 raise NotFound(str(ev))
             except ioboxd.Conflict, ev:
                 raise Conflict(str(ev))
-            except RuntimeError, ev:
+            except (RuntimeError, Exception), ev:
                 raise InternalServerError(str(ev))
             finally:
                 # finalize

@@ -67,9 +67,9 @@ def export_files(config=None, cookies=None, base_dir=None, identity=None, quiet=
                     get_file(schema_url, schema_output_file, {'accept': 'application/json'}, session)
                     file_list.append(schema_output_file)
 
-            except RuntimeError as e:
-                logger.error("Unhandled runtime error: %s", e)
-                raise e
+            except (RuntimeError, Exception) as e:
+                logger.error(get_named_exception(e))
+                raise RuntimeError(e)
 
         return file_list
 

@@ -1,15 +1,16 @@
-import simplejson as json
+import json
 from collections import OrderedDict
 
 
 def convert_json_obj_to_fasta_lines(obj, params):
-
+    column_map = None
     comment_line = ''
     data_line = ''
+    if params:
+        column_map = params.get("column_map", None)
 
-    column_map = params.get("column_map", None)
     if (len(obj) > 1) and (not column_map):
-        raise RuntimeError("FASTA converter input data has more than one element and a column map was not specified.")
+        raise RuntimeError("FASTA converter input data has more than one element and no column map was specified.")
     elif len(obj) == 1:
         k, v = obj.popitem()
         lines = str("%s\n" % v)
@@ -37,7 +38,10 @@ def convert_json_file_to_fasta(input_file, output_file, params):
             data = input_data
             is_json_stream = True
         else:
-            data = json.load(input_data, object_pairs_hook=OrderedDict)
+            try:
+                data = json.load(input_data, object_pairs_hook=OrderedDict)
+            except ValueError:
+                data = {}
 
         for entry in data:
             if is_json_stream:

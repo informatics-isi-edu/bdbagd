@@ -131,7 +131,7 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
                 elif output_format == 'fasta':
                     convert_to_fasta(output_file, output_path, output_format_params, url, ro_manifest)
 
-            except RuntimeError as e:
+            except (RuntimeError, Exception) as e:
                 logger.error(bdbag.get_named_exception(e))
                 bdb.cleanup_bag(bag_path)
                 raise e
