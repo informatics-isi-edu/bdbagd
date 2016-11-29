@@ -120,13 +120,14 @@ def export_bag(config=None, cookies=None, base_dir=None, identity=None, quiet=Fa
 
                 if output_format == 'prefetch':
                     prefetch_files(output_file,
-                                   base_path=os.path.join(bag_path, 'data'),
-                                   subdir_path=final_output_path,
-                                   session=session,
-                                   ro_manifest=ro_manifest)
+                                   os.path.join(bag_path, 'data'),
+                                   final_output_path,
+                                   session,
+                                   output_format_params,
+                                   ro_manifest)
 
                 elif output_format == 'fetch':
-                    create_remote_file_manifest(remote_file_manifest, output_file, ro_manifest)
+                    create_remote_file_manifest(remote_file_manifest, output_file, output_format_params, ro_manifest)
 
                 elif output_format == 'fasta':
                     convert_to_fasta(output_file, output_path, output_format_params, url, ro_manifest)
@@ -197,7 +198,7 @@ def get_schema_for_output(schema_name, schema_url, schema_output_path, session, 
                               content=''.join(["../data/", schema_name]))
 
 
-def prefetch_files(input_manifest, base_path, subdir_path, session, ro_manifest=None):
+def prefetch_files(input_manifest, base_path, subdir_path, session, output_format_params=None, ro_manifest=None):
     logger.info("Retrieving file(s)...")
     try:
         with open(input_manifest, "r") as in_file:
@@ -231,7 +232,7 @@ def prefetch_files(input_manifest, base_path, subdir_path, session, ro_manifest=
         os.remove(input_manifest)
 
 
-def create_remote_file_manifest(remote_file_manifest, input_file, ro_manifest=None):
+def create_remote_file_manifest(remote_file_manifest, input_file, output_format_params=None, ro_manifest=None):
     with open(input_file, "r") as in_file, open(remote_file_manifest, "w") as remote_file:
         for line in in_file:
             remote_file.write(line)

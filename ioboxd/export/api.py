@@ -75,7 +75,7 @@ def authenticate(host, cookies=None, username=None, password=None):
     elif cookies:
         session = open_session(host, cookies=cookies)
     else:
-        raise Unauthorized("The requested service requires authentication.")
+        session = open_session(host)
 
     return session
 
