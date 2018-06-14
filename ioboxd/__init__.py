@@ -20,34 +20,3 @@ def web_urls():
         '/export/file/([^/]+)/(.+)', ExportRetrieve,
     )
     return tuple(urls)
-
-
-class IOBoxException (Exception):
-    """Base class for IOBox API exceptions."""
-    pass
-
-
-class BadRequest (IOBoxException):
-    """Exceptions representing malformed requests."""
-    pass
-
-
-class Conflict (IOBoxException):
-    """Exceptions representing conflict between usage and current state."""
-    pass
-
-
-class Forbidden (IOBoxException):
-    """Exceptions representing lack of authorization for known client."""
-    pass
-
-
-class Unauthenticated (IOBoxException):
-    """Exceptions representing lack of authorization for anonymous client."""
-    pass
-
-
-class NotFound (IOBoxException):
-    """Exceptions representing attempted access to unknown resource."""
-    pass
-

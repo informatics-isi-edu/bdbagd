@@ -20,8 +20,7 @@ import webauthn2
 import struct
 import urllib
 import ioboxd
-from webauthn2.util import context_from_environment
-from webauthn2 import merge_config
+from webauthn2.util import merge_config, context_from_environment
 
 
 SERVICE_BASE_DIR = os.path.expanduser("~")
@@ -112,6 +111,7 @@ class RestException(web.HTTPError):
 class NotModified(RestException):
     status = '304 Not Modified'
     message = 'Resource not modified.'
+
 
 class TemplatedRestException(RestException):
     error_type = ''
@@ -255,18 +255,7 @@ def web_method():
             try:
                 # run actual method
                 return original_method(*args)
-
-            except ioboxd.BadRequest, ev:
-                raise BadRequest(str(ev))
-            except ioboxd.Unauthenticated, ev:
-                raise Unauthorized(str(ev))
-            except ioboxd.Forbidden, ev:
-                raise Forbidden(str(ev))
-            except ioboxd.NotFound, ev:
-                raise NotFound(str(ev))
-            except ioboxd.Conflict, ev:
-                raise Conflict(str(ev))
-            except (RuntimeError, Exception), ev:
+            except RuntimeError, ev:
                 raise InternalServerError(str(ev))
             finally:
                 # finalize

@@ -1,26 +1,16 @@
 import os
+import sys
 import errno
-import certifi
 import logging
-import mimetypes
-import os.path
 import uuid
-import urlparse
-import requests
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
-from ioboxd.core import STORAGE_PATH, AUTHENTICATION, get_client_identity, client_has_identity, Unauthorized
-
-CHUNK_SIZE = 1024 * 1024
-HEADERS = {'Connection': 'keep-alive'}
+import web
+from deriva.core import urlparse, format_credential, format_exception
+from deriva.transfer import GenericDownloader
+from ioboxd.core import STORAGE_PATH, AUTHENTICATION, client_has_identity, get_client_identity, BadRequest, \
+    Unauthorized, logger as sys_logger
 
 logger = logging.getLogger('')
 logger.propagate = False
-
-
-def get_named_exception(e):
-    exc = "".join(("[", type(e).__name__, "] "))
-    return "".join((exc, str(e)))
 
 
 def configure_logging(level=logging.INFO, log_path=None):
@@ -69,84 +59,62 @@ def check_access(directory):
     return False
 
 
-def authenticate(host, cookies=None, username=None, password=None):
-    if username and password:
-        session = open_session(host, login_params={'username': username, 'password': password})
-    elif cookies:
-        session = open_session(host, cookies=cookies)
-    else:
-        session = open_session(host)
+def export(config=None, base_dir=None, quiet=False, files_only=False):
 
-    return session
-
-
-def open_session(host, cookies=None, login_params=None):
-    session = requests.session()
-    retries = Retry(connect=5,
-                    read=5,
-                    backoff_factor=1.0,
-                    status_forcelist=[500, 502, 503, 504])
-
-    session.mount('http://', HTTPAdapter(max_retries=retries))
-    session.mount('https://', HTTPAdapter(max_retries=retries))
-
-    if cookies:
-        session.cookies.update(cookies)
-        return session
-    if login_params:
-        url = ''.join([host, '/ermrest/authn/session'])
-        r = session.post(url, headers=HEADERS, data=login_params, verify=certifi.where())
-        if r.status_code > 203:
-            raise Unauthorized('Open Session Failed with Status Code: %s\n%s\n' % (r.status_code, r.text))
-        else:
-            logger.info("Session established: %s", url)
-
-    return session
-
-
-def get_file(url, output_path, headers, session):
-    if output_path:
+    log_handler = configure_logging(logging.WARN if quiet else logging.INFO,
+                                    log_path=os.path.abspath(os.path.join(base_dir, '.log')))
+    try:
+        if not config:
+            raise BadRequest("No configuration specified.")
+        server = dict()
         try:
-            output_dir = os.path.dirname(os.path.abspath(output_path))
-            if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-            if not headers:
-                headers = HEADERS
+            # parse host/catalog params
+            catalog_config = config["catalog"]
+            host = catalog_config["host"]
+            if host.startswith("http"):
+                url = urlparse(host)
+                server["protocol"] = url.scheme
+                server["host"] = url.netloc
             else:
-                headers.update(HEADERS)
-            if session is not None:
-                r = session.get(url, headers=headers, stream=True, verify=certifi.where())
-            else:
-                r = requests.get(url, headers=headers, stream=True, verify=certifi.where())
-            if r.status_code != 200:
-                file_error = "File transfer failed: [%s]" % output_path
-                url_error = 'HTTP GET Failed for url: %s' % url
-                host_error = "Host %s responded:\n\n%s" % (urlparse.urlsplit(url).netloc, r.text)
-                # logger.error(file_error)
-                # logger.error(url_error)
-                # logger.error(host_error)
-                raise RuntimeError('%s\n\n%s\n%s' % (file_error, url_error, host_error))
-            else:
-                with open(output_path, 'wb') as data_file:
-                    for chunk in r.iter_content(CHUNK_SIZE):
-                        data_file.write(chunk)
-                    data_file.flush()
-                logger.info('File transfer successful: [%s]' % output_path)
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError('HTTP Request Exception: %s %s' % (e.errno, e.message))
+                server["protocol"] = "https"
+                server["host"] = host
+            server["catalog_id"] = catalog_config.get('catalog_id', "1")
 
+            # parse credential params
+            token = catalog_config.get("token", None)
+            username = catalog_config.get("username", None)
+            password = catalog_config.get("password", None)
 
-def guess_mimetype(file_path):
-    mtype = mimetypes.guess_type(file_path, False)
-    mimetype = "+".join([mtype[0], mtype[1]]) if (mtype[0] is not None and mtype[1] is not None) \
-        else (mtype[0] if mtype[0] is not None else mtype[1])
-    return mimetype
+            # sanity-check some bag params
+            if "bag" in config:
+                if files_only:
+                    del config["bag"]
+                else:
+                    if not config["bag"].get("bag_archiver"):
+                        config["bag"]["bag_archiver"] = "zip"
 
+        except (KeyError, AttributeError) as e:
+            raise BadRequest('Error parsing configuration: %s' % format_exception(e))
 
-def has_attr(obj, attr, quiet=False):
-    if getattr(obj, attr, None) is None:
-        if not quiet:
-            logger.warn("Unable to locate attribute [%s] in object: %s" %
-                        (attr, str(obj)))
-        return False
-    return True
+        try:
+            auth_token = token if token else web.cookies().get("webauthn")
+            credentials = format_credential(token=auth_token,
+                                            username=username,
+                                            password=password)
+        except ValueError as e:
+            raise Unauthorized(format_exception(e))
+
+        try:
+            downloader = GenericDownloader(server, output_dir=base_dir, config=config, credentials=credentials)
+            identity = get_client_identity()
+            user_id = username if not identity else identity['id']
+            create_access_descriptor(base_dir, identity=user_id)
+            sys_logger.info("Creating export at [%s] on behalf of user [%s]" % (base_dir, user_id))
+            return downloader.download(identity)
+        except (KeyError, AttributeError) as e:
+            raise BadRequest(format_exception(e))
+        except:
+            et, ev, tb = sys.exc_info()
+            raise RuntimeError(format_exception(ev))
+    finally:
+        logger.removeHandler(log_handler)

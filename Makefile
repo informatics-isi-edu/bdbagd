@@ -29,7 +29,7 @@ UNINSTALL=$(UNINSTALL_DIRS)
 
 # make this the default target
 install: conf/wsgi_ioboxd.conf
-		pip2 install -I --process-dependency-links --trusted-host github.com  .
+		pip2 install --no-deps .
 
 testvars:
 		@echo DAEMONUSER=$(DAEMONUSER)
@@ -56,7 +56,7 @@ uninstall:
 #       -rmdir --ignore-fail-on-non-empty -p $(UNINSTALL_DIRS)
 
 preinstall_centos:
-		yum -y install python python-pip python-psycopg2 python-dateutil python-webpy pytz
+		yum -y install python python-pip python-psycopg2 python-dateutil python-webpy pytz python-tzlocal
 
 preinstall_ubuntu:
 		apt-get -y install python python-pip python-psycopg2 python-dateutil python-webpy python-tz

@@ -1,4 +1,7 @@
-from ioboxd.core import *
+import os
+import web
+import urllib
+from ioboxd.core import web_method, RestHandler, NotFound, Forbidden, BadRequest, STORAGE_PATH
 from ioboxd.export.api import check_access
 
 
@@ -27,7 +30,6 @@ class ExportRetrieve (RestHandler):
             return Forbidden("The currently authenticated user is not permitted to access the specified resource.")
 
         for dirname, dirnames, filenames in os.walk(export_dir):
-
             # first, deal with the special case "metadata" files...
             if ".access" in filenames:
                 filenames.remove(".access")
@@ -52,7 +54,7 @@ class ExportRetrieve (RestHandler):
                     if not requested_file:
                         # if there is more than one file in the resource bucket and the caller wasn't explicit about
                         # which one to retrieve, it is a bad request.
-                        if filenames.__len__() > 1:
+                        if len(filenames) > 1:
                             raise BadRequest("The resource %s contains more than one file, it is therefore necessary "
                                              "to specify a filename in the request URL." % key)
                         else:
