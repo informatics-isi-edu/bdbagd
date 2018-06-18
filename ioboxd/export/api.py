@@ -82,7 +82,7 @@ def export(config=None, base_dir=None, quiet=False, files_only=False):
 
             # parse credential params
             token = catalog_config.get("token", None)
-            username = catalog_config.get("username", None)
+            username = catalog_config.get("username", "Anonymous")
             password = catalog_config.get("password", None)
 
             # sanity-check some bag params
@@ -107,9 +107,9 @@ def export(config=None, base_dir=None, quiet=False, files_only=False):
         try:
             downloader = GenericDownloader(server, output_dir=base_dir, config=config, credentials=credentials)
             identity = get_client_identity()
-            user_id = username if not identity else identity['id']
-            create_access_descriptor(base_dir, identity=user_id)
-            sys_logger.info("Creating export at [%s] on behalf of user [%s]" % (base_dir, user_id))
+            user_id = username if not identity else identity.get('display_name', identity.get('id'))
+            create_access_descriptor(base_dir, identity=username if not identity else identity.get('id'))
+            sys_logger.info("Creating export at [%s] on behalf of user: %s" % (base_dir, user_id))
             return downloader.download(identity)
         except (KeyError, AttributeError) as e:
             raise BadRequest(format_exception(e))
