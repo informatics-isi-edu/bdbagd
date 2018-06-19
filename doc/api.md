@@ -1,5 +1,5 @@
 # ioboxd REST API reference
-The `ioboxd` service provides both export and import functionality to and from an ERMrest catalog via a REST API. 
+The `ioboxd` service provides export  functionality from an ERMrest catalog via a REST API.
 The service is generally configured to be co-located on the same server with the ERMrest catalog that it is providing data services for.
 
 **Exporting individual files**
@@ -13,415 +13,433 @@ result files which can then be retrieved via `GET`.  URLs for result files are r
 #### Export file(s)
 Executes one more ERMrest queries and writes the results to individual files.
  
-* **URL**
+###### **URL**
 
-  /export/file
+/export/file
 
-* **Method:**
+###### **Method:**
 
-	`POST`
-  
-*  **URL Params**
+`POST`
+
+###### **URL Params**
 	
-	None
+None
 
-* **Data Params**
+###### **Data Params**
 
-	The input data is composed of a JSON object with the following form:
-    ##### root (object)
-	| Variable | Type | Inclusion| Description |
-	| --- | --- | --- | --- |
-	| `catalog` | `catalog` | required | A `catalog` object. See below.
-	##### `catalog` (object)
-	| Variable | Type | Inclusion| Description |
-	| --- | --- | --- | --- |
-	| `host`| string | required | The hostname (and port) of the ERMrest service to query.
-	| `path` | string | required | The catalog path, e.g. `/ermrest/catalog/1`.
-	| `username` | string | optional | If `username` is not specified, authentication is assumed to come from the `webauthn` authentication context stored in the caller's cookie.
-	| `password` | string | optional | The `password` field is only used when `username` is specifed.
-	| `queries` | array[`query`] | required | An array of `query` objects. See below.
-	##### `query` (object)
-	| Variable | Type | Inclusion| Description |
-	| --- | --- | --- | --- |
-	| `query_path` | string | required | An ERMrest query predicate, e.g. `/entity/subject/subject_id=12345`
-	| `output_path` | string | required | A relative path, delimited with `/` which will be used to create the target output path. The last component of the path will be used as the base filename.  
-	| `output_name` | string | optional | Can be used to override the parsing behavior of `output_path` by providing an explicit filename.
-	| `output_format` | string | required | A keyword argument used to specify the output format.
+The input data is composed of a JSON object with the following form:
+
+##### root (object)
+
+| Variable | Type | Inclusion| Description |
+| --- | --- | --- | --- |
+| `catalog` | `catalog` | required | A `catalog` object. See below.
+
+##### `catalog` (object)
+
+| Variable | Type | Inclusion| Description |
+| --- | --- | --- | --- |
+| `host`| string | required | The hostname (and port) of the ERMrest service to query.
+| `catalog_id` | string | optional | The catalog identifier, e.g. `1`.
+| `username` | string | optional | If `username` is not specified, authentication is assumed to come from the `webauthn` authentication context stored in the caller's cookie.
+| `password` | string | optional | The `password` field is only used when `username` is specifed.
+| `queries` | array[`query`] | required | An array of `query` objects. See below.
+
+##### `query` (object)
+
+| Variable | Type | Inclusion| Description |
+| --- | --- | --- | --- |
+| `query_path` | string | required | An ERMrest query predicate, e.g. `/entity/subject/subject_id=12345`
+| `output_path` | string | required | A relative path, delimited with `/` which will be used to create the target output path. The last component of the path will be used as the base filename.
+| `output_name` | string | optional | Can be used to override the parsing behavior of `output_path` by providing an explicit filename.
+| `output_format` | string | required | A keyword argument used to specify the output format.
 
 
-* **Success Response:**
+###### **Success Response:**
+**Code:** 200 
 
-  * **Code:** 200 <br />
-    **Content:** 
-    ```
-    http://localhost:8080/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/genotypes.csv
-    http://localhost:8080/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/phenotypes.csv
-	```
+**Content:**
+```
+http://localhost:8080/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/genotypes.csv
+http://localhost:8080/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/phenotypes.csv
+```
  
-* **Error Responses:**
+###### **Error Responses:**
 
-  * **Code:** 404 NOT FOUND <br /> 
-  * **Code:** 401 UNAUTHORIZED <br />
-  * **Code:** 400 BAD REQUEST <br />
-  * **Code:** 500 INTERNAL SERVER ERROR <br />
+* **404:**  NOT FOUND 
+* **401:**  UNAUTHORIZED 
+* **400:**  BAD REQUEST 
+* **500:**  INTERNAL SERVER ERROR 
 
-* **Sample Call:**
+###### **Sample Call:**
 
-	```javascript
-	var exportParameters = 
-	{
-	    "catalog":
-	    {
-	        "host": "http://localhost:8080",
-	        "path": "/ermrest/catalog/1",
-	        "username": "devuser",
-	        "password": "devpass",
-	        "queries":
-	        [
-	          {
-	            "query_path": "/entity/A:=dev:subject/A1:=snp_v/snp_id=rs6265",
-	            "output_path": "genotypes",
-	            "output_format": "csv"
-	          },
-	          {
-	            "query_path": "/entity/A:=dev:subject/A1:=snp_v/snp_id=rs6265/$A/B:=dev:subject_phenotypes_v",
-	            "output_path": "phenotypes",
-	            "output_format": "csv"
-	          }
-	        ]
-	    }
-	};
-	
-	$.ajax({
-	    url: "/export/file",
-	    dataType: "json",
-	    type : "POST",
-	    data: exportParameters,
-	    success : function(r) {
-	      console.log(r);
-	    }
-	});
-	```
+```javascript
+var exportParameters =
+{
+    "catalog":
+    {
+        "host": "http://localhost:8080",
+        "catalog_id": "1",
+        "username": "devuser",
+        "password": "devpass",
+        "queries":
+        [
+          {
+            "query_path": "/entity/A:=dev:subject/A1:=snp_v/snp_id=rs6265",
+            "output_path": "genotypes",
+            "output_format": "csv"
+          },
+          {
+            "query_path": "/entity/A:=dev:subject/A1:=snp_v/snp_id=rs6265/$A/B:=dev:subject_phenotypes_v",
+            "output_path": "phenotypes",
+            "output_format": "csv"
+          }
+        ]
+    }
+};
+
+$.ajax({
+    url: "/export/file",
+    dataType: "json",
+    type : "POST",
+    data: exportParameters,
+    success : function(r) {
+      console.log(r);
+    }
+});
+```
 ----
 
 #### Retrieve exported file(s)
 Retrieves a file previously created by a `POST`.
 
-* **URL**
+###### **URL**
 
-  /export/file/\<id\>/\<filename\>
+/export/file/\<id\>/\<filename\>
 
-* **Method:**
+###### **Method:**
 
-	`GET`
+`GET`
   
-*  **URL Params**
+######  **URL Params**
 	
-   **Required:**
+**Required:**
+
+`id=[string]`
+
+**Optional:**
+
+`filename=[string]` - This argument is required when the `uri-list` returned from `POST` contains more than one entry. 
+If it is not specified and there is more than one file result, a `400 Bad Request` is returned.
+
+###### **Data Params**
+
+None
+
+###### **Success Response:**
+
+**Code:** 200 
+
+**Content:** The file content.
  
-   `id=[string]`
+###### **Error Responses:**
 
-   **Optional:**
- 
-   `filename=[string]` - This argument is required when the`uri-list` returned from `POST` contains more than one entry. 
-   If it is not specified and there is more than one file result, a `400 Bad Request` is returned.
+* **404:**  NOT FOUND 
+* **403:**  FORBIDDEN 
+* **401:**  UNAUTHORIZED 
+* **400:**  BAD REQUEST 
+* **500:**  INTERNAL SERVER ERROR 
 
-* **Data Params**
+###### **Sample Call:**
 
-	None
-
-* **Success Response:**
-
-  * **Code:** 200 <br />
-    **Content:** The file content.
- 
-* **Error Responses:**
-
-  * **Code:** 404 NOT FOUND <br />
-  * **Code:** 403 FORBIDDEN <br />
-  * **Code:** 401 UNAUTHORIZED <br />
-  * **Code:** 400 BAD REQUEST <br />
-  * **Code:** 500 INTERNAL SERVER ERROR <br />
-
-* **Sample Call:**
-
-	```javascript	
-	$.ajax({
-	    url: "/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/genotypes.csv",
-	    type : "GET",
-	    success : function(r) {
-	      console.log(r);
-	    }
-	});
-	```
+```javascript	
+$.ajax({
+    url: "/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/genotypes.csv",
+    type : "GET",
+    success : function(r) {
+      console.log(r);
+    }
+});
+```
 ----	
 
 #### Retrieve log file for exported file(s)
 Retrieves the log file generated by an invocation of `POST`.
 
-* **URL**
+###### **URL**
 
-  /export/file/\<id\>/log
+/export/file/\<id\>/log
 
-* **Method:**
+###### **Method:**
 
-	`GET`
+`GET`
   
-*  **URL Params**
+###### **URL Params**
 	
-   **Required:**
+**Required:**
+
+`id=[string]`
+
+###### **Data Params**
+
+None
+
+###### **Success Response:**
+
+**Code:** 200
+
+**Content:** The file content.
  
-   `id=[string]`
+###### **Error Responses:**
 
-* **Data Params**
+* **404:**  NOT FOUND
+* **403:**  FORBIDDEN
+* **401:**  UNAUTHORIZED
+* **400:**  BAD REQUEST
+* **500:**  INTERNAL SERVER ERROR
 
-	None
+###### **Sample Call:**
 
-* **Success Response:**
-
-  * **Code:** 200 <br />
-    **Content:** The file content.
- 
-* **Error Responses:**
-
-  * **Code:** 404 NOT FOUND <br />
-  * **Code:** 403 FORBIDDEN <br />
-  * **Code:** 401 UNAUTHORIZED <br />
-  * **Code:** 400 BAD REQUEST <br />
-  * **Code:** 500 INTERNAL SERVER ERROR <br />
-
-* **Sample Call:**
-
-	```javascript	
-	$.ajax({
-	    url: "/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/log",
-	    type : "GET",
-	    success : function(r) {
-	      console.log(r);
-	    }
-	});
-	```	
+```javascript
+$.ajax({
+    url: "/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/log",
+    type : "GET",
+    success : function(r) {
+      console.log(r);
+    }
+});
+```
 	
 **Exporting Bags**
 ----
 
 This API endpoint is used to perform one or more queries to an ERMrest catalog and create a 
-[BDBag](https://github.com/ini-bdds/bdbag) archive file which can then be retrieved via `GET`.  The URL for the result bag is returned in the response body as `Content-Type:text/uri-list`.
+[BDBag](https://github.com/fair-research/bdbag) archive file which can then be retrieved via `GET`.  The URL for the result bag is returned in the response body as `Content-Type:text/uri-list`.
 
-----
 
 #### Export bag
-Executes one more ERMrest queries and writes the results to a [BDBag](https://github.com/ini-bdds/bdbag).
+Executes one more ERMrest queries and writes the results to a [BDBag](https://github.com/fair-research/bdbag).
  
-* **URL**
+###### **URL**
 
-  /export/bdbag
+/export/bdbag
 
-* **Method:**
+###### **Method:**
 
-	`POST`
+`POST`
   
-*  **URL Params**
+###### **URL Params**
 	
-	None
+None
 
-* **Data Params**
+###### **Data Params**
 
-	The input data is composed of a JSON object with the following form:
-    ##### root (object)
-	| Variable | Type | Inclusion| Description |
-	| --- | --- | --- | --- |
-	| `bag` | `bag` | required | A `bag` object. See below.	
-	| `catalog` | `catalog` | required | A `catalog` object. See below.
-	##### `bag` (object)
-	| Variable | Type | Inclusion| Description |
-	| --- | --- | --- | --- |
-	| `bag_name`| string, enum [`"zip"`,`"tgz"`,`"bz2"`,`"tar"`] | required | The base file name of the bag. An appropriate extension will be added to the base depending on the archive type selected.
-	| `bag_archiver` | string | required | The archive format used to serialize the result bag.
-	| `bag_metadata` | object | optional | A simple 'dictionary' object consisting of key-value pairs. The only supported primitive type for value pairs is `string`. The metdata object will be written directly to the bag's `bag-info.txt` file.
-	##### `catalog` (object)
-	| Variable | Type | Inclusion| Description |
-	| --- | --- | --- | --- |
-	| `host`| string | required | The hostname (and port) of the ERMrest service to query.
-	| `path` | string | required | The catalog path, e.g. `/ermrest/catalog/1`.
-	| `username` | string | optional | If `username` is not specified, authentication is assumed to come from the `webauthn` authentication context stored in the caller's cookie.
-	| `password` | string | optional | The `password` field is only used when `username` is specifed.
-	| `queries` | array[`query`] | required | An array of `query` objects. See below.
-	##### `query` (object)
-	| Variable | Type | Inclusion| Description |
-	| --- | --- | --- | --- |
-	| `query_path` | string | required | An ERMrest query predicate, e.g. `/entity/subject/subject_id=12345`
-	| `output_path` | string | required | A relative path, delimited with `/` which will be used to create the target output path. The last component of the path will be used as the base filename.  
-	| `output_name` | string | optional | Can be used to override the parsing behavior of `output_path` by providing an explicit filename.
-	| `output_format` | string | required | A keyword argument used to specify the output format.
+The input data is composed of a JSON object with the following form:
+
+##### root (object)
+
+| Variable | Type | Inclusion| Description |
+| --- | --- | --- | --- |
+| `bag` | `bag` | required | A `bag` object. See below.
+| `catalog` | `catalog` | required | A `catalog` object. See below.
+
+##### `bag` (object)
+
+| Variable | Type | Inclusion| Description |
+| --- | --- | --- | --- |
+| `bag_name`| string, enum [`"zip"`,`"tgz"`,`"bz2"`,`"tar"`] | required | The base file name of the bag. An appropriate extension will be added to the base depending on the archive type selected.
+| `bag_archiver` | string | required | The archive format used to serialize the result bag.
+| `bag_metadata` | object | optional | A simple 'dictionary' object consisting of key-value pairs. The only supported primitive type for value pairs is `string`. The metdata object will be written directly to the bag's `bag-info.txt` file.
+
+##### `catalog` (object)
+
+| Variable | Type | Inclusion| Description |
+| --- | --- | --- | --- |
+| `host`| string | required | The hostname (and port) of the ERMrest service to query.
+| `catalog_id` | string | optional | The catalog identifer, e.g. `1`.
+| `username` | string | optional | If `username` is not specified, authentication is assumed to come from the `webauthn` authentication context stored in the caller's cookie.
+| `password` | string | optional | The `password` field is only used when `username` is specifed.
+| `queries` | array[`query`] | required | An array of `query` objects. See below.
+
+#####  `query` (object)
+
+| Variable | Type | Inclusion| Description |
+| --- | --- | --- | --- |
+| `query_path` | string | required | An ERMrest query predicate, e.g. `/entity/subject/subject_id=12345`
+| `output_path` | string | required | A relative path, delimited with `/` which will be used to create the target output path. The last component of the path will be used as the base filename.
+| `output_name` | string | optional | Can be used to override the parsing behavior of `output_path` by providing an explicit filename.
+| `output_format` | string | required | A keyword argument used to specify the output format.
 
 
-* **Success Response:**
+###### **Success Response:**
 
-  * **Code:** 200 <br />
-    **Content:** 
-    ```
-    http://localhost:8080/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/sample-bag.zip
-	```
+**Code:** 200
+
+**Content:**
+```
+http://localhost:8080/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/sample-bag.zip
+```
  
-* **Error Responses:**
+###### **Error Responses:**
 
-  * **Code:** 404 NOT FOUND <br /> 
-  * **Code:** 401 UNAUTHORIZED <br />
-  * **Code:** 400 BAD REQUEST <br />
-  * **Code:** 500 INTERNAL SERVER ERROR <br />
+* **404:**  NOT FOUND
+* **401:**  UNAUTHORIZED
+* **400:**  BAD REQUEST
+* **500:**  INTERNAL SERVER ERROR
 
-* **Sample Call:**
+###### **Sample Call:**
 
-	```javascript
-	var exportParameters = 
-	{
-	    "bag":
-	    {
-	      "bag_name": "sample-bag",
-	      "bag_archiver":"zip",
-	      "bag_metadata":
-	      {
-	        "Source-Organization": "USC Information Sciences Institute, Informatics Systems Research Division",
-	        "Contact-Name": "Mike D'Arcy",
-	        "External-Description": "A bag containing a sample PheWas cohort for downstream analysis.",
-	        "Internal-Sender-Identifier": "USC-ISI-IRSD"
-	      }
-	    },
-	    "catalog":
-	    {
-	      "host": "https://localhost:8080",
-	      "path": "/ermrest/catalog/1",
-	      "username": "",
-	      "password": "",
-	      "queries":
-	      [
-	        {
-	          "query_path": "/entity/A:=pnc:subject/A1:=snp_v/snp_id=rs6265/$A/B:=pnc:metrics_v",
-	          "output_path": "metrics",
-	          "output_format": "csv"
-	        },
-	        {
-	          "query_path": "/entity/A:=pnc:subject/A1:=snp_v/snp_id=rs6265",
-	          "output_path": "genotypes",
-	          "output_format": "csv"
-	        },
-	        {
-	          "query_path": "/entity/A:=pnc:subject/A1:=snp_v/snp_id=rs6265/$A/B:=pnc:subject_phenotypes_v",
-	          "output_path": "phenotypes",
-	          "output_format": "csv"
-	        },
-	        {
-	          "query_path": "/attribute/A:=pnc:subject/A1:=snp_v/snp_id=rs6265/$A/B:=pnc:image_files/filename::ciregexp::0mm.mgh/url:=B:uri,length:=B:bytes,filename:=B:filepath,sha256:=B:sha256sum",
-	          "output_path": "images",
-	          "output_name": "image-fetch-manifest",
-	          "output_format": "fetch"
-	        }
-	      ]
-	    }
-	};
-	
-	$.ajax({
-	    url: "/export/file",
-	    dataType: "json",
-	    type : "POST",
-	    data: exportParameters,
-	    success : function(r) {
-	      console.log(r);
-	    }
-	});
-	```
+```javascript
+var exportParameters =
+{
+    "bag":
+    {
+      "bag_name": "sample-bag",
+      "bag_archiver":"zip",
+      "bag_metadata":
+      {
+        "Source-Organization": "USC Information Sciences Institute, Informatics Systems Research Division",
+        "Contact-Name": "Mike D'Arcy",
+        "External-Description": "A bag containing a sample PheWas cohort for downstream analysis.",
+        "Internal-Sender-Identifier": "USC-ISI-IRSD"
+      }
+    },
+    "catalog":
+    {
+      "host": "https://localhost:8080",
+      "path": "/ermrest/catalog/1",
+      "username": "",
+      "password": "",
+      "queries":
+      [
+        {
+          "query_path": "/entity/A:=pnc:subject/A1:=snp_v/snp_id=rs6265/$A/B:=pnc:metrics_v",
+          "output_path": "metrics",
+          "output_format": "csv"
+        },
+        {
+          "query_path": "/entity/A:=pnc:subject/A1:=snp_v/snp_id=rs6265",
+          "output_path": "genotypes",
+          "output_format": "csv"
+        },
+        {
+          "query_path": "/entity/A:=pnc:subject/A1:=snp_v/snp_id=rs6265/$A/B:=pnc:subject_phenotypes_v",
+          "output_path": "phenotypes",
+          "output_format": "csv"
+        },
+        {
+          "query_path": "/attribute/A:=pnc:subject/A1:=snp_v/snp_id=rs6265/$A/B:=pnc:image_files/filename::ciregexp::0mm.mgh/url:=B:uri,length:=B:bytes,filename:=B:filepath,sha256:=B:sha256sum",
+          "output_path": "images",
+          "output_name": "image-fetch-manifest",
+          "output_format": "fetch"
+        }
+      ]
+    }
+};
+
+$.ajax({
+    url: "/export/file",
+    dataType: "json",
+    type : "POST",
+    data: exportParameters,
+    success : function(r) {
+      console.log(r);
+    }
+});
+```
 ----
 
 #### Retrieve an exported bag
 Retrieves a bag previously created by a `POST`.
 
-* **URL**
+###### **URL**
 
-  /export/bdbag/\<id\>
+/export/bdbag/\<id\>
 
-* **Method:**
+###### **Method:**
 
-	`GET`
+`GET`
   
-*  **URL Params**
+###### **URL Params**
 	
-   **Required:**
+**Required:**
+
+`id=[string]`
+
+###### **Data Params**
+
+None
+
+###### **Success Response:**
+
+**Code:** 200
+
+**Content:** The file content.
  
-   `id=[string]`
+###### **Error Responses:**
 
-* **Data Params**
+* **404:**  NOT FOUND
+* **403:**  FORBIDDEN
+* **401:**  UNAUTHORIZED
+* **400:**  BAD REQUEST
+* **500:**  INTERNAL SERVER ERROR
 
-	None
+###### **Sample Call:**
 
-* **Success Response:**
-
-  * **Code:** 200 <br />
-    **Content:** The file content.
- 
-* **Error Responses:**
-
-  * **Code:** 404 NOT FOUND <br />
-  * **Code:** 403 FORBIDDEN <br />
-  * **Code:** 401 UNAUTHORIZED <br />
-  * **Code:** 400 BAD REQUEST <br />
-  * **Code:** 500 INTERNAL SERVER ERROR <br />
-
-* **Sample Call:**
-
-	```javascript	
-	$.ajax({
-	    url: "/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc",
-	    type : "GET",
-	    success : function(r) {
-	      console.log(r);
-	    }
-	});
-	```
+```javascript
+$.ajax({
+    url: "/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc",
+    type : "GET",
+    success : function(r) {
+      console.log(r);
+    }
+});
+```
 ----	
 
 #### Retrieve log file for exported bag
 Retrieves the log file generated by an invocation of `POST`.
 
-* **URL**
+###### **URL**
 
-  /export/bdbag/\<id\>/log
+/export/bdbag/\<id\>/log
 
-* **Method:**
+###### **Method:**
 
-	`GET`
+`GET`
   
-*  **URL Params**
+###### **URL Params**
 	
-   **Required:**
+**Required:**
+
+`id=[string]`
+
+###### **Data Params**
+
+None
+
+###### **Success Response:**
+
+**Code:** 200
+
+**Content:** The file content.
  
-   `id=[string]`
+###### **Error Responses:**
 
-* **Data Params**
+  * **404:**  NOT FOUND
+  * **403:**  FORBIDDEN
+  * **401:**  UNAUTHORIZED
+  * **400:**  BAD REQUEST
+  * **500:**  INTERNAL SERVER ERROR
 
-	None
+###### **Sample Call:**
 
-* **Success Response:**
-
-  * **Code:** 200 <br />
-    **Content:** The file content.
- 
-* **Error Responses:**
-
-  * **Code:** 404 NOT FOUND <br />
-  * **Code:** 403 FORBIDDEN <br />
-  * **Code:** 401 UNAUTHORIZED <br />
-  * **Code:** 400 BAD REQUEST <br />
-  * **Code:** 500 INTERNAL SERVER ERROR <br />
-
-* **Sample Call:**
-
-	```javascript	
-	$.ajax({
-	    url: "/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/log",
-	    type : "GET",
-	    success : function(r) {
-	      console.log(r);
-	    }
-	});
-	```		
+```javascript
+$.ajax({
+    url: "/export/file/9ad15e5b-9c2c-4faf-8829-05fa8252c8bc/log",
+    type : "GET",
+    success : function(r) {
+      console.log(r);
+    }
+});
+```
