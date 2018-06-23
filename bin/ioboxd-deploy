@@ -100,6 +100,9 @@ then
     semanage fcontext --add --type "${SEMANAGE_HTTPD_SYS_RW_CONTENT_T}" "/var/www/iobox(/.*)?"
     restorecon -rv /var/www/iobox
     setsebool -P httpd_enable_homedirs on
+    setsebool -P httpd_can_network_connect on
+    setsebool -P httpd_execmem on
+
 fi
 
 [[ ! -r ${HTTPDCONFDIR}/wsgi_ioboxd.conf ]] && cp ${SHAREDIR}/wsgi_ioboxd.conf  ${HTTPDCONFDIR}/.

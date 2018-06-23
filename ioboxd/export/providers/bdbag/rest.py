@@ -12,6 +12,6 @@ class ExportBag(RestHandler):
     def POST(self):
         key, output_dir = create_output_dir()
         file_list = export(config=json.loads(web.data()), base_dir=output_dir)
-        url = ''.join([web.ctx.home, web.ctx.path, '/', key])
+        url = ''.join([web.ctx.home, web.ctx.path, '/' if not web.ctx.path.endswith("/") else "", key])
 
         return self.create_response(url)

@@ -15,6 +15,7 @@ class ExportFiles(RestHandler):
         file_list = export(config=json.loads(web.data()), base_dir=output_dir, files_only=True)
         url_list = list()
         for file_path in file_list:
-            url_list.append(''.join([web.ctx.home, web.ctx.path, str('/%s/%s' % (key, os.path.basename(file_path)))]))
+            url_list.append(''.join([web.ctx.home, web.ctx.path, '/' if not web.ctx.path.endswith("/") else "",
+                                     str('%s/%s' % (key, os.path.basename(file_path)))]))
 
         return self.create_response(url_list)
