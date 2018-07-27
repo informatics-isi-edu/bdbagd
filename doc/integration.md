@@ -39,21 +39,179 @@ The object structure of an export template annotation is defined as follows:
 ## `source` (object)
 | Variable | Type | Inclusion| Description |
 | --- | --- | --- | --- |
-| `name` | string | required | A schema-qualified ERMrest table name in the form `schema_name:table_name`.
-| `type` | string, enum [`entity`,`attribute`, `attributegroup`] | required | The type of ERMrest query projection to perform.  Valid values are `entity`,`attribute`, and `attributegroup`.
-| `filter` | string | optional | An optional ERMrest filter predicate.
-| `column_map` | object | conditionally required | For queries where the `type` is set to `attribute` or `attributegroup`, a column map must be specified.  The column map is a simple 'dictionary' object which serves two purposes: the keys of the dictionary specify the columns to select from source table, while the values represent the name of the result column in tbe target projection.
+| `api` | string, enum [`entity`,`attribute`, `attributegroup`] | required | The type of ERMrest query projection to perform.  Valid values are `entity`,`attribute`, and `attributegroup`.
+| `table` | string | required | A schema-qualified ERMrest table name in the form `schema_name:table_name`. The string MAY be escaped according to [RFC 3986](https://tools.ietf.org/html/rfc3986).
+| `path` | string | optional | An optional ERMrest path predicate. The string MUST be escaped according to [RFC 3986](https://tools.ietf.org/html/rfc3986) if it contains user-generated identifiers that use the reserved character set. See the [ERMRest URL conventions](https://github.com/informatics-isi-edu/ermrest/blob/master/docs/api-doc/index.md#url-conventions) for additional information.
 
 ## `destination` (object)
 | Variable | Type | Inclusion| Description |
 | --- | --- | --- | --- |
 | `name` | string | required | The base name to use for the output file.
-| `type` | string | required | A type keyword that determines the output format. Supported values are dependent on the `template`.`format_type` selected. For the `FILE` type, the values `csv`, `json`, and `fasta` are currently supported. For the `BAG` type, the values `csv`,`json`,`fasta`,`fetch` and `prefetch` are currently supported. See additional notes on destination format types.
+| `type` | string | required | A type keyword that determines the output format. Supported values are dependent on the `template`.`format_type` selected. For the `FILE` type, the values `csv`, `json`, are currently supported. For the `BAG` type, the values `csv`, `json`, `fetch` and `download` are currently supported. See additional notes on destination format types.
 | `params` | object | conditionally required | An object containing destination format-specific parameters.  Some destination formats (particularly those that require some kind of post-processing or data transformation), may require additional parameters  to be specified.
 
+## Supported output formats
+The following output format types are supported by default:
+
+| Tag | Format | Description|
+| --- | --- | --- |
+|[`csv`](#csv)|CSV|CSV format with column header row.
+|[`json`](#json)|JSON|JSON Array of row objects.
+|[`download`](#download)|Asset download|File assets referenced by URL are downloaded to local storage relative to `destination.name`.
+|[`fetch`](#fetch)|Asset reference|`Bag`-based. File assets referenced by URL are assigned as remote file references via `fetch.txt`.
+
+## Output format details
+Each _output format processor_ is designed for a specific task, and the task types may vary for a given data export task.
+Some _output formats_ are designed to handle the export of tabular data from the catalog, while others are meant to handle the export of file assets that are referenced by tables in the catalog.
+Other _output formats_ may be implemented that could perform a combination of these tasks, implement a new format, or perform some kind of data transformation.
+<a name="csv"></a>
+### `csv`
+This format processor generates a standard Comma Separated Values formatted text file. The first row is a comma-delimited list of column names, and all subsequent rows are comma-delimted values.  Fields are not enclosed in quotation marks.
+
+Example output:
+```
+subject_id,sample_id,snp_id,gt,chipset
+CNP0001_F09,600009963128,rs6265,0/1,HumanOmniExpress
+CNP0002_F15,600018902293,rs6265,0/0,HumanOmniExpress
+```
+
+<a name="json"></a>
+### `json`
+This format processor generates a text file containing a JSON Array of row data, where each JSON object in the array represents one row.
+
+Example output:
+```json
+[{"subject_id":"CNP0001_F09","sample_id":"600009963128","snp_id":"rs6265","gt":"0/1","chipset":"HumanOmniExpress"},
+ {"subject_id":"CNP0002_F15","sample_id":"600018902293","snp_id":"rs6265","gt":"0/0","chipset":"HumanOmniExpress"}]
+ ```
+
+<a name="download"></a>
+### `download`
+This format processor performs multiple actions. First, it issues a `json-stream` catalog query using the parameters specified in `source`,
+in order to generate a _file download manifest_ file named `download-manifest.json`. This manifest is simply a set of rows which MUST contain at least one field named `url`, and MAY contain a field named `filename`,
+and MAY contain other arbitrary fields. If the `filename` field is present, it will be appended to the final (calculated) `destination.name`, otherwise the service will perform a _HEAD_ HTTP request against
+the `url` for the `Content-Disposition` of the referenced file asset. If this query fails to determine the filename, the application falls back to using the final string component of the `url` field after the last `/` character.
+
+After the _file download manifest_ is generated, the application attempts to download the files referenced in each result row's `url` field to the local filesystem, storing them at the base relative path specified by `destination.name`.
+
+IMPORTANT: When configuring the `source` parameter block for a `download` destination, each row in the result of the query against `source.table` MUST contain a column named `url` that is the actual URL path to the content that will be downloaded.
+The type of `source.api` that is used does not matter, as long as the result data rows contain a `url` column. However, in general it is suggested to use the `attribute` type as the `source.api` so that only the minimum amount of tuples required to
+perform the download are returned.  Additionally, use of the `attribute` API allows for easy renaming of column names, in case the target table stores the file location using a column name other than `url`.
+
+For more information on ERMRest attribute API syntax, see the following [documentation](https://github.com/informatics-isi-edu/ermrest/blob/master/docs/api-doc/data/naming.md#attribute-names).
+<a name="fetch"></a>
+### `fetch`
+This format processor performs multiple actions. First, it issues a `json-stream` catalog query against the specified `query_path`, in order to generate a  _file download manifest_.
+This manifest is simply a set of rows which MUST contain at least one field named `url`, and SHOULD contain two additional fields: `length`,
+which is the size of the referenced file in bytes, and (at least) one of the following _checksum_ fields; `md5`, `sha1`, `sha256`, `sha512`. If the _length_ and appropriate _checksum_ fields are missing,
+an attempt will be made to dynamically determine these fields from the remote `url` by issuing a _HEAD_ HTTP request and parsing the result headers for the missing information.
+If the required values cannot be determined this way, it is an error condition and the transfer will abort.
+
+Unlike the `download` processor, the `fetch` processor does not actually download any asset files, but rather uses the query results to create a `bag` with checksummed manifest entries that reference each remote asset via the `bag`'s `fetch.txt` file.
+
+Similar to the `download` processor, the output of the catalog query MAY contain other fields. If the `filename` field is present, it will be appended to the final (calculated) `source.destination`, otherwise the application will perform a _HEAD_ HTTP request against
+the `url` for the `Content-Disposition` of the referenced file asset. If this query fails to determine the filename, the application falls back to using the final name component of the `url` field after the last `/` character.
+
+Also, like the `download` processor, when configuring the `source` parameter block for `fetch` output, each row in the result of the query against `source.table` MUST contain the required columns stated above.
+The type of `source.api` that is used does not matter, as long as the result data rows contain the necessary columns. As with the `download` processor, the use of the `attribute` ERMRest query API is recommended.
 
 ### Example 1
-This example maps multiple single table queries to single FILE outputs using the FASTA format. 
+This example shows how a Bag can be created that includes both tabular data and localized assets by using an attribute query to select a
+filtered set of files from an image asset table.
+```json
+{
+  "templates": [
+    {
+      "name": "default",
+      "format_name":"BDBag",
+      "format_type":"BAG",
+      "outputs": [
+        {
+          "source": {
+            "api": "entity",
+            "table": "pnc:metrics_v"
+          },
+          "destination": {
+            "name": "metrics",
+            "type": "csv"
+          }
+        },
+        {
+          "source": {
+            "api": "attribute",
+            "table": "pnc:image_files",
+            "path": "url:=uri"
+          },
+          "destination": {
+            "name": "images",
+            "type": "download"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+### Example 2
+This example shows how a Bag can be created with remote file references by using an attribute query to select a
+filtered set of file types and mapping columns from an image asset table, which can then be used to automatically create
+ the bag's `fetch.txt`.
+```json
+{
+  "templates": [
+    {
+      "name": "default",
+      "format_name":"BDBag",
+      "format_type":"BAG",
+      "outputs": [
+        {
+          "source": {
+            "api": "entity",
+            "table": "pnc:metrics_v"
+          },
+          "destination": {
+            "name": "metrics",
+            "type": "csv"
+          }
+        },
+        {
+          "source": {
+            "api": "entity",
+            "table": "pnc:snp_v"
+          },
+          "destination": {
+            "name": "genotypes",
+            "type": "csv"
+          }
+        },
+        {
+          "source": {
+            "api": "entity",
+            "table": "pnc:subject_phenotypes_v"
+          },
+          "destination": {
+            "name": "phenotypes",
+            "type": "csv"
+          }
+        },
+        {
+          "source": {
+            "api": "attribute",
+            "table": "pnc:image_files",
+            "path": "url:=uri,length:=bytes,filename:=filepath,sha256:=sha256sum"
+          },
+          "destination": {
+            "name": "images",
+            "type": "fetch"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+### Example 3
+This example maps multiple single table queries to single FILE outputs using the FASTA format.
 ```json
 {
   "templates": [
@@ -64,13 +222,9 @@ This example maps multiple single table queries to single FILE outputs using the
       "outputs": [
         {
           "source": {
-            "name": "gpcr_browser:construct_gui",
-            "type": "attribute",
-            "filter": "!orf::null::&!orf=%3F",
-            "column_map": {
-              "title": "title",
-              "orf": "orf"
-            }
+            "api": "attribute",
+            "table": "gpcr_browser:construct_gui",
+            "path": "!orf::null::&!orf=%3F/title,orf"
           },
           "destination": {
             "name": "orf",
@@ -92,13 +246,9 @@ This example maps multiple single table queries to single FILE outputs using the
       "outputs": [
         {
           "source": {
-            "name": "gpcr_browser:construct_gui",
-            "type": "attribute",
-            "filter": "!receptor_protein_sequence::null::",
-            "column_map": {
-              "title": "title",
-              "receptor_protein_sequence": "receptor_protein_sequence"
-            }
+            "api": "attribute",
+            "table": "gpcr_browser:construct_gui",
+            "path": "!receptor_protein_sequence::null::/title,receptor_protein_sequence"
           },
           "destination": {
             "name": "protein",
@@ -120,13 +270,9 @@ This example maps multiple single table queries to single FILE outputs using the
       "outputs": [
         {
           "source": {
-            "name": "gpcr_browser:construct_gui",
-            "type": "attribute",
-            "filter": "!exptnucseq::null::&!exptnucseq=NONE",
-            "column_map": {
-              "title": "title",
-              "exptnucseq": "exptnucseq"
-            }
+            "api": "attribute",
+            "table": "gpcr_browser:construct_gui",
+            "path": "!exptnucseq::null::&!exptnucseq=NONE/title,exptnucseq"
           },
           "destination": {
             "name": "nucleotide",
@@ -144,7 +290,7 @@ This example maps multiple single table queries to single FILE outputs using the
   ]
 }
 ```
-### Example 2
+### Example 4
 This example uses the same queries from Example 1, but instead packages the results in a Bag archive rather than as a set
  of individual files.
 ```json
@@ -152,18 +298,14 @@ This example uses the same queries from Example 1, but instead packages the resu
   "templates": [
     {
       "name": "all_fasta",
-      "format_name": "BAG (ALL FASTA)",
+      "format_name": "BDBag (ALL FASTA)",
       "format_type": "BAG",
       "outputs": [
         {
           "source": {
-            "name": "gpcr_browser:construct_gui",
-            "type": "attribute",
-            "filter": "!orf::null::&!orf=%3F",
-            "column_map": {
-              "title": "title",
-              "orf": "orf"
-            }
+            "api": "attribute",
+            "table": "gpcr_browser:construct_gui",
+            "path": "!orf::null::&!orf=%3F/title,orf"
           },
           "destination": {
             "name": "orf",
@@ -178,13 +320,9 @@ This example uses the same queries from Example 1, but instead packages the resu
         },
         {
           "source": {
-            "name": "gpcr_browser:construct_gui",
-            "type": "attribute",
-            "filter": "!receptor_protein_sequence::null::",
-            "column_map": {
-              "title": "title",
-              "receptor_protein_sequence": "receptor_protein_sequence"
-            }
+            "api": "attribute",
+            "table": "gpcr_browser:construct_gui",
+            "path": "!receptor_protein_sequence::null:://title,receptor_protein_sequence"
           },
           "destination": {
             "name": "protein",
@@ -199,13 +337,9 @@ This example uses the same queries from Example 1, but instead packages the resu
         },
         {
           "source": {
-            "name": "gpcr_browser:construct_gui",
-            "type": "attribute",
-            "filter": "!exptnucseq::null::&!exptnucseq=NONE",
-            "column_map": {
-              "title": "title",
-              "exptnucseq": "exptnucseq"
-            }
+            "api": "attribute",
+            "table": "gpcr_browser:construct_gui",
+            "path": "!exptnucseq::null::&!exptnucseq=NONE/title,exptnucseq"
           },
           "destination": {
             "name": "nucleotide",
@@ -216,70 +350,6 @@ This example uses the same queries from Example 1, but instead packages the resu
                 "exptnucseq":"data"
               }
             }
-          }
-        }
-      ]
-    }
-  ]
-}
-```
-### Example 3
-This example shows how a Bag can be created with remote file references by using an attribute query to select a 
-filtered set of file types and mapping columns from an image asset table, which can then be used to automatically create
- the bag's `fetch.txt`.
-```json
-{
-  "templates": [
-    {
-      "name": "default",
-      "format_name":"BAG",
-      "format_type":"BAG",
-      "outputs": [
-        {
-          "source": {
-            "name": "pnc:metrics_v",
-            "type": "entity"
-          },
-          "destination": {
-            "name": "metrics",
-            "type": "csv"
-          }
-        },
-        {
-          "source": {
-            "name": "pnc:snp_v",
-            "type": "entity"
-          },
-          "destination": {
-            "name": "genotypes",
-            "type": "csv"
-          }
-        },
-        {
-          "source": {
-            "name": "pnc:subject_phenotypes_v",
-            "type": "entity"
-          },
-          "destination": {
-            "name": "phenotypes",
-            "type": "csv"
-          }
-        },
-        {
-          "source": {
-            "name": "pnc:image_files",
-            "type": "attribute",
-            "filter": "filename::ciregexp::0mm.mgh",
-            "column_map": {
-              "url": "uri",
-              "length": "bytes",
-              "filename": "filepath",
-              "sha256": "sha256sum"
-            }
-          },
-          "destination": {
-            "name": "images",
-            "type": "fetch"
           }
         }
       ]
