@@ -201,6 +201,11 @@ class NotImplemented(RestException):
     message = 'Request not implemented for this resource.'
 
 
+class BadGateway(RestException):
+    status = '502 Bad Gateway'
+    message = 'A downstream processing error prevented the server from fulfilling this request.'
+
+
 def client_has_identity(identity):
     if identity == "*":
         return True
@@ -255,8 +260,6 @@ def web_method():
             try:
                 # run actual method
                 return original_method(*args)
-            except RuntimeError, ev:
-                raise InternalServerError(str(ev))
             finally:
                 # finalize
                 parts = log_parts()

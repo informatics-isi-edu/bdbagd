@@ -7,7 +7,7 @@ import web
 from deriva.core import urlparse, format_credential, format_exception
 from deriva.transfer import GenericDownloader
 from ioboxd.core import STORAGE_PATH, AUTHENTICATION, client_has_identity, get_client_identity, BadRequest, \
-    Unauthorized, logger as sys_logger
+    Unauthorized, BadGateway, logger as sys_logger
 
 logger = logging.getLogger('')
 logger.propagate = False
@@ -115,6 +115,6 @@ def export(config=None, base_dir=None, quiet=False, files_only=False):
             raise BadRequest(format_exception(e))
         except:
             et, ev, tb = sys.exc_info()
-            raise RuntimeError(format_exception(ev))
+            raise BadGateway(format_exception(ev))
     finally:
         logger.removeHandler(log_handler)
