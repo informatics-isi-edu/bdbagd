@@ -88,6 +88,7 @@ chgrp apache /var/www/iobox
 pgid ${DAEMONUSER} || pgcreateuser -D -R -S ${DAEMONUSER}
 
 $SU -c "psql -c 'GRANT webauthn TO ${DAEMONUSER}'" - ${PGADMIN}
+$SU -c "bdbag --version" - ${DAEMONUSER}
 
 if [[ -r /etc/redhat-release ]]
 then
@@ -95,7 +96,7 @@ then
     SEMANAGE_HTTPD_SYS_RW_CONTENT_T=httpd_sys_rw_content_t
 
     semanage fcontext --add --ftype d --type "${SEMANAGE_HTTPD_SYS_CONTENT_T}" "/home/${DAEMONUSER}"
-    semanage fcontext --add --type "${SEMANAGE_HTTPD_SYS_RW_CONTENT_T}" "/home/${DAEMONUSER}/.bdbag(/.*)?"
+    semanage fcontext --add --type "${SEMANAGE_HTTPD_SYS_CONTENT_T}" "/home/${DAEMONUSER}/.bdbag(/.*)?"
     semanage fcontext --add --type "${SEMANAGE_HTTPD_SYS_CONTENT_T}" "/home/${DAEMONUSER}/ioboxd_config.json"
     restorecon -rv /home/${DAEMONUSER}
     semanage fcontext --add --type "${SEMANAGE_HTTPD_SYS_RW_CONTENT_T}" "/var/www/iobox(/.*)?"
