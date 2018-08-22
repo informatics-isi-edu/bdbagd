@@ -102,6 +102,7 @@ then
     setsebool -P httpd_enable_homedirs on
     setsebool -P httpd_can_network_connect on
     setsebool -P httpd_execmem on
+    setsebool -P httpd_use_nfs on
 
 fi
 

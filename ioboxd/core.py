@@ -21,6 +21,7 @@ import struct
 import urllib
 import ioboxd
 from collections import OrderedDict
+from logging.handlers import SysLogHandler
 from webauthn2.util import merge_config, context_from_environment
 
 SERVICE_BASE_DIR = os.path.expanduser("~")
