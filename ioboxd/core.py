@@ -20,8 +20,8 @@ import webauthn2
 import struct
 import urllib
 import ioboxd
+from collections import OrderedDict
 from webauthn2.util import merge_config, context_from_environment
-
 
 SERVICE_BASE_DIR = os.path.expanduser("~")
 STORAGE_BASE_DIR = os.path.join("ioboxd", "data")
@@ -53,29 +53,26 @@ webauthn2_manager = webauthn2.Manager() if AUTHENTICATION == "webauthn" else Non
 # setup logger and web request log helpers
 logger = logging.getLogger('ioboxd')
 logger.setLevel(logging.INFO)
-sh = logging.StreamHandler()
-sh.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
-logger.addHandler(sh)
-
-# some log message templates
-log_template = "%(elapsed_s)d.%(elapsed_frac)4.4ds %(client_ip)s user=%(client_identity)s req=%(reqid)s"
-log_trace_template = log_template + " -- %(tracedata)s"
-log_final_template = log_template + " (%(status)s) %(method)s %(proto)s://%(host)s%(uri)s %(range)s %(type)s"
+try:
+    # the use of '/dev/log' causes SysLogHandler to assume the availability of Unix sockets
+    sysloghandler = SysLogHandler(address='/dev/log', facility=SysLogHandler.LOG_LOCAL1)
+except:
+    # this fallback allows this file to at least be cleanly imported on non-Unix systems
+    sysloghandler = logging.StreamHandler()
+syslogformatter = logging.Formatter('%(name)s[%(process)d.%(thread)d]: %(message)s')
+sysloghandler.setFormatter(syslogformatter)
+logger.addHandler(sysloghandler)
 
 
 def log_parts():
     """Generate a dictionary of interpolation keys used by our logging template."""
     now = datetime.datetime.now(pytz.timezone('UTC'))
     elapsed = (now - web.ctx.ioboxd_start_time)
-    client_identity = web.ctx.webauthn2_context.client \
-        if web.ctx.webauthn2_context and web.ctx.webauthn2_context.client else ''
-    if type(client_identity) is dict:
-        client_identity = json.dumps(client_identity, separators=(',', ':'))
+    client_identity_obj = web.ctx.webauthn2_context and web.ctx.webauthn2_context.client or None
     parts = dict(
-        elapsed_s=elapsed.seconds,
-        elapsed_frac=elapsed.microseconds / 100,
+        elapsed=elapsed.seconds + 0.001 * (elapsed.microseconds / 1000),
         client_ip=web.ctx.ip,
-        client_identity=urllib.quote(client_identity),
+        client_identity_obj=client_identity_obj,
         reqid=web.ctx.ioboxd_request_guid
     )
     return parts
@@ -87,8 +84,17 @@ def request_trace(tracedata):
        tracedata: a string representation of trace event data
     """
     parts = log_parts()
-    parts['tracedata'] = tracedata
-    logger.info((log_trace_template % parts).encode('utf-8'))
+    od = OrderedDict([
+        (k, v) for k, v in [
+            ('elapsed', parts['elapsed']),
+            ('req', parts['reqid']),
+            ('trace', tracedata),
+            ('client', parts['client_ip']),
+            ('user', parts['client_identity_obj']),
+        ]
+        if v
+    ])
+    logger.info(json.dumps(od, separators=(', ', ':')).encode('utf-8'))
 
 
 class RestException(web.HTTPError):
@@ -249,30 +255,62 @@ def web_method():
             web.ctx.ioboxd_request_guid = base64.b64encode(struct.pack('Q', random.getrandbits(64)))
             web.ctx.ioboxd_start_time = datetime.datetime.now(pytz.timezone('UTC'))
             web.ctx.ioboxd_request_content_range = '-/-'
-            web.ctx.ioboxd_content_type = 'unknown'
+            web.ctx.ioboxd_request_error_detail = None
+            web.ctx.ioboxd_content_type = None
             web.ctx.webauthn2_manager = webauthn2_manager
             web.ctx.webauthn2_context = webauthn2.Context()  # set empty context for sanity
             web.ctx.ioboxd_request_trace = request_trace
 
             # get client authentication context
             get_client_auth_context()
-
             try:
                 # run actual method
                 return original_method(*args)
+            except web.HTTPError as e:
+                web.ctx.ioboxd_request_error_detail = e.data
+                raise
+            except Exception as e:
+                web.ctx.ioboxd_request_error_detail = str(e)
+                raise
             finally:
                 # finalize
                 parts = log_parts()
-                parts.update(dict(
-                    status=web.ctx.status,
-                    method=web.ctx.method,
-                    proto=web.ctx.protocol,
-                    host=web.ctx.host,
-                    uri=web.ctx.env['REQUEST_URI'],
-                    range=web.ctx.ioboxd_request_content_range,
-                    type=web.ctx.ioboxd_content_type
-                ))
-                logger.info((log_final_template % parts).encode('utf-8'))
+                session = web.ctx.webauthn2_context.session if web.ctx.webauthn2_context else None
+                if session is None or isinstance(session, dict):
+                    pass
+                else:
+                    session = session.to_dict()
+
+                try:
+                    dcctx = web.ctx.env.get('HTTP_DERIVA_CLIENT_CONTEXT', 'null')
+                    dcctx = urllib.unquote(dcctx)
+                    dcctx = json.loads(dcctx)
+                except:
+                    dcctx = None
+
+                od = OrderedDict([
+                    (k, v) for k, v in [
+                        ('elapsed', parts['elapsed']),
+                        ('req', parts['reqid']),
+                        ('scheme', web.ctx.protocol),
+                        ('host', web.ctx.host),
+                        ('status', web.ctx.status),
+                        ('detail', web.ctx.ioboxd_request_error_detail),
+                        ('method', web.ctx.method),
+                        ('path', web.ctx.env['REQUEST_URI']),
+                        ('range', web.ctx.ioboxd_request_content_range),
+                        ('type', web.ctx.ioboxd_content_type),
+                        ('client', parts['client_ip']),
+                        ('user', parts['client_identity_obj']),
+                        ('referrer', web.ctx.env.get('HTTP_REFERER')),
+                        ('agent', web.ctx.env.get('HTTP_USER_AGENT')),
+                        ('session', session),
+                        ('track', web.ctx.webauthn2_context.tracking if web.ctx.webauthn2_context else None),
+                        ('dcctx', dcctx),
+                    ]
+                    if v
+                ])
+                logger.info(json.dumps(od, separators=(', ', ':')).encode('utf-8'))
 
         return wrapper
 
