@@ -8,8 +8,8 @@ from deriva.core import urlparse, format_credential, format_exception
 from deriva.transfer import GenericDownloader
 from deriva.transfer.download import DerivaDownloadAuthenticationError, DerivaDownloadAuthorizationError, \
     DerivaDownloadConfigurationError, DerivaDownloadError
-from ioboxd.core import STORAGE_PATH, AUTHENTICATION, client_has_identity, get_client_identity, BadRequest, \
-    Unauthorized, Forbidden, Conflict, BadGateway, logger as sys_logger
+from ioboxd.core import STORAGE_PATH, AUTHENTICATION, client_has_identity, get_client_identity, get_client_wallet, \
+    BadRequest, Unauthorized, Forbidden, Conflict, BadGateway, logger as sys_logger
 
 logger = logging.getLogger('')
 logger.propagate = False
@@ -110,13 +110,14 @@ def export(config=None, base_dir=None, quiet=False, files_only=False):
             identity = get_client_identity()
             user_id = username if not identity else identity.get('display_name', identity.get('id'))
             create_access_descriptor(base_dir, identity=username if not identity else identity.get('id'))
+            wallet = get_client_wallet()
         except (KeyError, AttributeError) as e:
             raise BadRequest(format_exception(e))
 
         try:
             sys_logger.info("Creating export at [%s] on behalf of user: %s" % (base_dir, user_id))
             downloader = GenericDownloader(server, output_dir=base_dir, config=config, credentials=credentials)
-            return downloader.download(identity)
+            return downloader.download(identity=identity, wallet=wallet)
         except DerivaDownloadAuthenticationError as e:
             raise Unauthorized(format_exception(e))
         except DerivaDownloadAuthorizationError as e:

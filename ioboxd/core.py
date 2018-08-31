@@ -231,19 +231,28 @@ def get_client_identity():
         return None
 
 
-def get_client_auth_context():
+def get_client_wallet():
+    get_client_auth_context(from_environment=False)
+    if web.ctx.webauthn2_context and web.ctx.webauthn2_context.extra_values:
+        return web.ctx.webauthn2_context.extra_values.get("wallet")
+    else:
+        return None
 
-    if web.ctx.webauthn2_context and web.ctx.webauthn2_context.client:
+
+def get_client_auth_context(from_environment=True):
+
+    if web.ctx.webauthn2_context and web.ctx.webauthn2_context.client and from_environment:
         return
 
     try:
-        web.ctx.webauthn2_context = context_from_environment()
-        if web.ctx.webauthn2_context.client is None:
-            web.ctx.webauthn2_context = webauthn2_manager.get_request_context() if webauthn2_manager else None
-            logger.debug("webauthn2_context: %s" % web.ctx.webauthn2_context)
-            # if web.ctx.webauthn2_context and web.ctx.webauthn2_context.client is None:
-            #    raise Unauthorized('The requested service requires client authentication.')
-    except (ValueError, IndexError), ev:
+        if from_environment:
+            web.ctx.webauthn2_context = context_from_environment()
+            if web.ctx.webauthn2_context is not None and web.ctx.webauthn2_context.client is not None:
+                return
+
+        web.ctx.webauthn2_context = webauthn2_manager.get_request_context() if webauthn2_manager else None
+        # logger.debug("webauthn2_context: %s" % web.ctx.webauthn2_context)
+    except (ValueError, IndexError):
         raise Unauthorized('The requested service requires client authentication.')
 
 
