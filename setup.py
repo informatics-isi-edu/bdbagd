@@ -14,7 +14,7 @@ setup(
     url='https://github.com/informatics-isi-edu/ioboxd',
     maintainer='USC Information Sciences Institute ISR Division',
     maintainer_email='misd-support@isi.edu',
-    version="0.3.5",
+    version="0.3.6",
     zip_safe=False,
     packages=find_packages(),
     scripts=["bin/ioboxd-deploy", "bin/ioboxd-prune"],
