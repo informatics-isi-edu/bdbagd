@@ -1,5 +1,5 @@
 # ioboxd
-REST Web Service Interface for IOBox
+REST Web Service Interface DERIVA I/O.
 
 The `ioboxd` webservice provides a set of REST APIs for exporting and importing data to and from ERMrest.
  The service supports both export and import of data to/from individual files, or filesets contained within 
