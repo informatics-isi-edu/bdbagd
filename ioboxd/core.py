@@ -355,12 +355,13 @@ class RestHandler(object):
         except Exception as e:
             raise NotFound(e)
 
-    def create_response(self, urls):
+    def create_response(self, urls, force_uri_list=False):
         """Form response for resource creation request."""
         web.ctx.status = '201 Created'
         web.header('Content-Type', 'text/uri-list')
         if isinstance(urls, str):
-            web.header('Location', urls)
+            if not force_uri_list:
+                web.header('Location', urls)
             body = urls + '\n'
         elif isinstance(urls, list):
             body = '\n'.join(urls)
