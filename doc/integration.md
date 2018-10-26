@@ -2,19 +2,15 @@
 
 The `ioboxd` service integration with Chaise is driven primarily through the use of ERMrest annotations.
 
-### Export 
+### Export
 
 Export of data from Chaise is configured through the use of *export templates*. An export template is a JSON object that
  is used in an ERMrest table annotation payload.  The annotation is specified using the following annotation key:
 * `tag:isrd.isi.edu,2016:export`
 
-The annotation payload is a JSON object containing a single array of `template` objects. One or more templates can be 
-specified for a given table entity.  Templates specify a format name and type, followed by a set of output descriptor 
+The annotation payload is a JSON object containing a single array of `template` objects. One or more templates can be
+specified for a given table entity.  Templates specify a format name and type, followed by a set of output descriptor
 objects. A template output descriptor maps one or more source table queries to one or more output file destinations.  
-
-The table entity that the template is bound to is considered the *root* of the query for join purposes. In other words, 
-any output sources listed in a table's export templates must have a foreign key relationship to the table entity that the 
-template is applied to.
 
 The object structure of an export template annotation is defined as follows:
 
@@ -25,29 +21,67 @@ The object structure of an export template annotation is defined as follows:
 ## `template` (object)
 | Variable | Type | Inclusion| Description |
 | --- | --- | --- | --- |
-| `name`| string | required | The name of the template instance, which should be unique among all other template instances in this `templates` array.
-| `format_name` | string | required | The display name that will be used to populate the Chaise export format drop-down box for this `template`. 
-| `format_type` | string, enum [`"FILE"`,`"BAG"`] | required | One of two keywords; `"FILE"` or `"BAG"`, used to determine the container format for results.
+| `displayname` | string | required | The display name that will be used to populate the Chaise export format drop-down box for this `template`.
+| `type` | string, enum [`"FILE"`,`"BAG"`] | required | One of two keywords; `"FILE"` or `"BAG"`, used to determine the container format for results.
 | `outputs` | array[`output`] | required | An array of `output` objects. See below.
 
 ## `output` (object)
 | Variable | Type | Inclusion| Description |
 | --- | --- | --- | --- |
 | `source` | `source` | required | An object that contains parameters used to generate source data by querying ERMrest.
-| `destination` | `destination` | required | An object that contains parameters used to render the results of the source query into a specified destination format. 
+| `destination` | `destination` | required | An object that contains parameters used to render the results of the source query into a specified destination format.
+
+## Output details
+
+- The table entity that the template is bound to is considered the *root* of the query for join purposes. Therefore this is how a query is going to be constructed based on the given attributes:
+
+        <output.api>/<current root path>/<output.path>
+
+- We are reserving the `M` alias for referring to the table entity that the template is bound to. So if you need to refer to that table in your path, you can use the reserved alias name.
+
+- The leading and trailing slash that you might have defined in your `path` will be stripped off and ignored.
+
+The following are some examples to better understand the output syntax. These are written for the table `pnc:metrics_v`,
+
+ - To export the `pnc:metrics_v` table data, your output would be
+
+    ```
+    {
+        "api": "entity"
+    }
+    ```
+ - To export data for the `pnc:snp_v` table that has a foreign key relationship with `pcn:metrics_v`, your output would be
+
+    ```
+    {
+        "api": "entity",
+        "path": "pnc:snap_v"
+    }
+    ```
+
+- To export only `RID`s of the table `pnc:metrics_v` that have exist in the foreign key relationship with `pnc:snap_v`, your output would be
+
+    ```
+    {
+        "api": "attributegroup",
+        "path": "pnc:snap_v/M:RID"
+    }
+    ```
+    In this example we are using the reserved alias `M` to refer to the table `pnc:metrics_v`.
+
+
 
 ## `source` (object)
 | Variable | Type | Inclusion| Description |
 | --- | --- | --- | --- |
 | `api` | string, enum [`entity`,`attribute`, `attributegroup`] | required | The type of ERMrest query projection to perform.  Valid values are `entity`,`attribute`, and `attributegroup`.
-| `table` | string | required | A schema-qualified ERMrest table name in the form `schema_name:table_name`. The string MAY be escaped according to [RFC 3986](https://tools.ietf.org/html/rfc3986).
 | `path` | string | optional | An optional ERMrest path predicate. The string MUST be escaped according to [RFC 3986](https://tools.ietf.org/html/rfc3986) if it contains user-generated identifiers that use the reserved character set. See the [ERMRest URL conventions](https://github.com/informatics-isi-edu/ermrest/blob/master/docs/api-doc/index.md#url-conventions) for additional information.
 
 ## `destination` (object)
 | Variable | Type | Inclusion| Description |
 | --- | --- | --- | --- |
 | `name` | string | required | The base name to use for the output file.
-| `type` | string | required | A type keyword that determines the output format. Supported values are dependent on the `template`.`format_type` selected. For the `FILE` type, the values `csv`, `json`, are currently supported. For the `BAG` type, the values `csv`, `json`, `fetch` and `download` are currently supported. See additional notes on destination format types.
+| `type` | string | required | A type keyword that determines the output format. Supported values are dependent on the `template`.`type` selected. For the `FILE` type, the values `csv`, `json`, are currently supported. For the `BAG` type, the values `csv`, `json`, `fetch` and `download` are currently supported. See additional notes on destination format types.
 | `params` | object | conditionally required | An object containing destination format-specific parameters.  Some destination formats (particularly those that require some kind of post-processing or data transformation), may require additional parameters  to be specified.
 
 ## Supported output formats
@@ -94,7 +128,7 @@ the `url` for the `Content-Disposition` of the referenced file asset. If this qu
 
 After the _file download manifest_ is generated, the application attempts to download the files referenced in each result row's `url` field to the local filesystem, storing them at the base relative path specified by `destination.name`.
 
-IMPORTANT: When configuring the `source` parameter block for a `download` destination, each row in the result of the query against `source.table` MUST contain a column named `url` that is the actual URL path to the content that will be downloaded.
+IMPORTANT: When configuring the `source` parameter block for a `download` destination, each row in the result MUST contain a column named `url` that is the actual URL path to the content that will be downloaded.
 The type of `source.api` that is used does not matter, as long as the result data rows contain a `url` column. However, in general it is suggested to use the `attribute` type as the `source.api` so that only the minimum amount of tuples required to
 perform the download are returned.  Additionally, use of the `attribute` API allows for easy renaming of column names, in case the target table stores the file location using a column name other than `url`.
 
@@ -112,7 +146,7 @@ Unlike the `download` processor, the `fetch` processor does not actually downloa
 Similar to the `download` processor, the output of the catalog query MAY contain other fields. If the `filename` field is present, it will be appended to the final (calculated) `source.destination`, otherwise the application will perform a _HEAD_ HTTP request against
 the `url` for the `Content-Disposition` of the referenced file asset. If this query fails to determine the filename, the application falls back to using the final name component of the `url` field after the last `/` character.
 
-Also, like the `download` processor, when configuring the `source` parameter block for `fetch` output, each row in the result of the query against `source.table` MUST contain the required columns stated above.
+Also, like the `download` processor, when configuring the `source` parameter block for `fetch` output, each row in the result of the query MUST contain the required columns stated above.
 The type of `source.api` that is used does not matter, as long as the result data rows contain the necessary columns. As with the `download` processor, the use of the `attribute` ERMRest query API is recommended.
 
 ### Example 1
@@ -123,13 +157,12 @@ filtered set of files from an image asset table.
   "templates": [
     {
       "name": "default",
-      "format_name":"BDBag",
-      "format_type":"BAG",
+      "displayname":"BDBag",
+      "type":"BAG",
       "outputs": [
         {
           "source": {
-            "api": "entity",
-            "table": "pnc:metrics_v"
+            "api": "entity"
           },
           "destination": {
             "name": "metrics",
@@ -139,8 +172,7 @@ filtered set of files from an image asset table.
         {
           "source": {
             "api": "attribute",
-            "table": "pnc:image_files",
-            "path": "url:=uri"
+            "path": "pnc:image_files/url:=uri",
           },
           "destination": {
             "name": "images",
@@ -161,13 +193,12 @@ filtered set of file types and mapping columns from an image asset table, which 
   "templates": [
     {
       "name": "default",
-      "format_name":"BDBag",
-      "format_type":"BAG",
+      "displayname":"BDBag",
+      "type":"BAG",
       "outputs": [
         {
           "source": {
-            "api": "entity",
-            "table": "pnc:metrics_v"
+            "api": "entity"
           },
           "destination": {
             "name": "metrics",
@@ -177,7 +208,7 @@ filtered set of file types and mapping columns from an image asset table, which 
         {
           "source": {
             "api": "entity",
-            "table": "pnc:snp_v"
+            "path": "pnc:snp_v"
           },
           "destination": {
             "name": "genotypes",
@@ -187,7 +218,7 @@ filtered set of file types and mapping columns from an image asset table, which 
         {
           "source": {
             "api": "entity",
-            "table": "pnc:subject_phenotypes_v"
+            "path": "pnc:subject_phenotypes_v"
           },
           "destination": {
             "name": "phenotypes",
@@ -197,8 +228,7 @@ filtered set of file types and mapping columns from an image asset table, which 
         {
           "source": {
             "api": "attribute",
-            "table": "pnc:image_files",
-            "path": "url:=uri,length:=bytes,filename:=filepath,sha256:=sha256sum"
+            "path": "pnc:image_files/url:=uri,length:=bytes,filename:=filepath,sha256:=sha256sum"
           },
           "destination": {
             "name": "images",
@@ -217,13 +247,12 @@ This example maps multiple single table queries to single FILE outputs using the
   "templates": [
     {
       "name": "orf",
-      "format_name": "FASTA (ORF)",
-      "format_type": "FILE",
+      "displayname": "FASTA (ORF)",
+      "type": "FILE",
       "outputs": [
         {
           "source": {
             "api": "attribute",
-            "table": "gpcr_browser:construct_gui",
             "path": "!orf::null::&!orf=%3F/title,orf"
           },
           "destination": {
@@ -241,13 +270,12 @@ This example maps multiple single table queries to single FILE outputs using the
     },
     {
       "name": "protein",
-      "format_name": "FASTA (Protein)",
-      "format_type": "FILE",
+      "displayname": "FASTA (Protein)",
+      "type": "FILE",
       "outputs": [
         {
           "source": {
             "api": "attribute",
-            "table": "gpcr_browser:construct_gui",
             "path": "!receptor_protein_sequence::null::/title,receptor_protein_sequence"
           },
           "destination": {
@@ -265,13 +293,12 @@ This example maps multiple single table queries to single FILE outputs using the
     },
     {
       "name": "nucleotide",
-      "format_name": "FASTA (Nucleotide)",
-      "format_type": "FILE",
+      "displayname": "FASTA (Nucleotide)",
+      "type": "FILE",
       "outputs": [
         {
           "source": {
             "api": "attribute",
-            "table": "gpcr_browser:construct_gui",
             "path": "!exptnucseq::null::&!exptnucseq=NONE/title,exptnucseq"
           },
           "destination": {
@@ -298,13 +325,12 @@ This example uses the same queries from Example 1, but instead packages the resu
   "templates": [
     {
       "name": "all_fasta",
-      "format_name": "BDBag (ALL FASTA)",
-      "format_type": "BAG",
+      "displayname": "BDBag (ALL FASTA)",
+      "type": "BAG",
       "outputs": [
         {
           "source": {
             "api": "attribute",
-            "table": "gpcr_browser:construct_gui",
             "path": "!orf::null::&!orf=%3F/title,orf"
           },
           "destination": {
@@ -321,7 +347,6 @@ This example uses the same queries from Example 1, but instead packages the resu
         {
           "source": {
             "api": "attribute",
-            "table": "gpcr_browser:construct_gui",
             "path": "!receptor_protein_sequence::null:://title,receptor_protein_sequence"
           },
           "destination": {
@@ -338,7 +363,6 @@ This example uses the same queries from Example 1, but instead packages the resu
         {
           "source": {
             "api": "attribute",
-            "table": "gpcr_browser:construct_gui",
             "path": "!exptnucseq::null::&!exptnucseq=NONE/title,exptnucseq"
           },
           "destination": {
