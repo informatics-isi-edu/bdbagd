@@ -14,7 +14,7 @@ setup(
     url='https://github.com/informatics-isi-edu/ioboxd',
     maintainer='USC Information Sciences Institute ISR Division',
     maintainer_email='misd-support@isi.edu',
-    version="0.3.7",
+    version="0.3.8",
     zip_safe=False,
     packages=find_packages(),
     scripts=["bin/ioboxd-deploy", "bin/ioboxd-prune"],
@@ -43,7 +43,8 @@ setup(
         "web.py",
         "psycopg2",
         "webauthn2",
-        "deriva"],
+        "deriva",
+        "bdbag"],
     license='Apache 2.0',
     classifiers=[
         'Intended Audience :: Science/Research',

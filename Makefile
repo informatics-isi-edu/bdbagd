@@ -29,8 +29,8 @@ UNINSTALL=$(UNINSTALL_DIRS)
 
 # make this the default target
 install: conf/wsgi_ioboxd.conf
-		pip2 install --no-deps 'bagit==1.6.4'
-		pip2 install --no-deps 'bdbag>=1.4.1'
+		pip2 install --no-deps 'bagit==1.7.0'
+		pip2 install --no-deps 'bdbag>=1.5.0'
 		pip2 install --no-deps .
 
 testvars:
