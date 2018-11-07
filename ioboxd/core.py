@@ -241,18 +241,16 @@ def get_client_wallet():
 
 def get_client_auth_context(from_environment=True):
 
-    if web.ctx.webauthn2_context and web.ctx.webauthn2_context.client and from_environment:
-        return
-
     try:
         if from_environment:
             web.ctx.webauthn2_context = context_from_environment()
             if web.ctx.webauthn2_context is not None and web.ctx.webauthn2_context.client is not None:
                 return
 
+        web.debug("falling back to webauthn2_manager.get_request_context() after failed context_from_environment()")
         web.ctx.webauthn2_context = webauthn2_manager.get_request_context() if webauthn2_manager else None
-        # logger.debug("webauthn2_context: %s" % web.ctx.webauthn2_context)
     except (ValueError, IndexError):
+        web.debug("Exception getting client authentication context: %s" % str(e))
         raise Unauthorized('The requested service requires client authentication.')
 
 

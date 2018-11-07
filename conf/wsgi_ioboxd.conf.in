@@ -9,7 +9,8 @@ WSGIPassAuthorization On
 WSGISocketPrefix @WSGISOCKETPREFIX@
 
 <Location "/iobox" >
-   Require all granted
+   AuthType webauthn
+   Require webauthn-optional
    WSGIProcessGroup ioboxd
 </Location>
 
