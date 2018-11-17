@@ -156,7 +156,6 @@ filtered set of files from an image asset table.
 {
   "templates": [
     {
-      "name": "default",
       "displayname":"BDBag",
       "type":"BAG",
       "outputs": [
@@ -192,7 +191,6 @@ filtered set of file types and mapping columns from an image asset table, which 
 {
   "templates": [
     {
-      "name": "default",
       "displayname":"BDBag",
       "type":"BAG",
       "outputs": [
@@ -246,7 +244,6 @@ This example maps multiple single table queries to single FILE outputs using the
 {
   "templates": [
     {
-      "name": "orf",
       "displayname": "FASTA (ORF)",
       "type": "FILE",
       "outputs": [
@@ -292,7 +289,6 @@ This example maps multiple single table queries to single FILE outputs using the
       ]
     },
     {
-      "name": "nucleotide",
       "displayname": "FASTA (Nucleotide)",
       "type": "FILE",
       "outputs": [
@@ -324,7 +320,6 @@ This example uses the same queries from Example 1, but instead packages the resu
 {
   "templates": [
     {
-      "name": "all_fasta",
       "displayname": "BDBag (ALL FASTA)",
       "type": "BAG",
       "outputs": [
